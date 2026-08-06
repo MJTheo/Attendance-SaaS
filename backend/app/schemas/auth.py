@@ -6,6 +6,11 @@ class SignupRequest(BaseModel):
     admin_name: str
 
 
+class InviteRequest(BaseModel):
+    email: str
+    name: str
+
+
 class UserProfile(BaseModel):
     id: str
     org_id: str

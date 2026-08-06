@@ -11,3 +11,11 @@ class UsersRepository:
         response = self._client.table("users").select("*").eq("id", user_id).limit(1).execute()
         rows = response.data
         return rows[0] if rows else None
+
+    def create(self, user_id: str, org_id: str, role: str, name: str, email: str) -> dict:
+        response = (
+            self._client.table("users")
+            .insert({"id": user_id, "org_id": org_id, "role": role, "name": name, "email": email})
+            .execute()
+        )
+        return response.data[0]

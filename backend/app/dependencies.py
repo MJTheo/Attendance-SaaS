@@ -17,10 +17,15 @@ def _service_role_client() -> Client:
 def get_service_role_client() -> Client:
     """Bypasses RLS entirely.
 
-    Reserved for exactly three call sites, per the signup/corrections/reports
-    design: AuthService.signup_organization, applying an approved correction's
-    new_value to attendance_records, and the APScheduler report job. Do not
-    wire this into a normal request-handling path — use get_user_client.
+    Reserved for four call sites: AuthService.signup_organization, applying an
+    approved correction's new_value to attendance_records, the APScheduler
+    report job, and InvitesService's use of the Supabase Admin API to create
+    a new auth identity for an invited staff member (the one operation here
+    that isn't an RLS bypass by choice — ordinary users can't create other
+    auth identities at all). The invited user's org profile row itself is
+    still written through the inviting admin's own user-scoped client, not
+    this one. Do not wire this into a normal request-handling path — use
+    get_user_client.
     """
     return _service_role_client()
 

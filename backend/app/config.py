@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     environment: str = "development"
     api_port: int = 8000
     cors_origins: str = "http://localhost:5173"
+    # Used to build the redirect link in staff-invite emails. Must also be
+    # added to the Supabase project's Auth > URL Configuration allow-list,
+    # or Supabase silently ignores it and falls back to the Site URL.
+    frontend_url: str = "http://localhost:5173"
     report_schedule_cron: str = "0 6 * * 1"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")

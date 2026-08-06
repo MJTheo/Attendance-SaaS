@@ -103,4 +103,9 @@ export const api = {
   approveCorrection: (id: string) => apiFetch<Correction>(`/corrections/${id}/approve`, { method: 'PATCH' }),
   rejectCorrection: (id: string) => apiFetch<Correction>(`/corrections/${id}/reject`, { method: 'PATCH' }),
   teamAttendance: () => apiFetch<TeamAttendanceRecord[]>('/admin/attendance'),
+  inviteStaff: (email: string, name: string) =>
+    apiFetch<UserProfile>('/admin/invite', {
+      method: 'POST',
+      body: JSON.stringify({ email, name }),
+    }),
 }

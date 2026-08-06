@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
-import { api, type Correction, type TeamAttendanceRecord, type UserProfile } from '../lib/api'
+import { api, ApiError, type Correction, type TeamAttendanceRecord, type UserProfile } from '../lib/api'
 import { Header } from '../components/Header'
 import { StatusDot, statusToVariant } from '../components/StatusDot'
 import { CorrectionsList } from '../components/CorrectionsList'
@@ -12,6 +12,11 @@ export function Team() {
   const [corrections, setCorrections] = useState<Correction[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteName, setInviteName] = useState('')
+  const [inviteError, setInviteError] = useState<string | null>(null)
+  const [inviteSuccess, setInviteSuccess] = useState<string | null>(null)
+  const [inviting, setInviting] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -53,6 +58,27 @@ export function Team() {
     }
   }
 
+  async function handleInvite(event: FormEvent) {
+    event.preventDefault()
+    setInviteError(null)
+    setInviteSuccess(null)
+    setInviting(true)
+    try {
+      await api.inviteStaff(inviteEmail, inviteName)
+      setInviteSuccess(`Invite sent to ${inviteEmail}`)
+      setInviteEmail('')
+      setInviteName('')
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setInviteError('That email is already registered')
+      } else {
+        setInviteError(err instanceof Error ? err.message : 'Failed to send invite')
+      }
+    } finally {
+      setInviting(false)
+    }
+  }
+
   if (loading && !profile) {
     return <div className="flex min-h-screen items-center justify-center text-text-muted">Loading…</div>
   }
@@ -74,6 +100,43 @@ export function Team() {
 
       <main className="mx-auto max-w-4xl px-6 py-8">
         {error && <p className="mb-4 font-mono text-sm text-status-warning">{error}</p>}
+
+        <section className="mb-8 rounded-lg border border-border bg-surface p-6">
+          <h2 className="mb-3 font-sans text-sm font-semibold uppercase tracking-wide text-text-muted">
+            Invite staff
+          </h2>
+          {inviteError && <p className="mb-3 font-mono text-xs text-status-warning">{inviteError}</p>}
+          {inviteSuccess && <p className="mb-3 font-mono text-xs text-status-good">{inviteSuccess}</p>}
+          <form onSubmit={handleInvite} className="flex flex-wrap items-end gap-3">
+            <label className="block">
+              <span className="mb-1 block font-mono text-xs uppercase tracking-wide text-text-muted">Name</span>
+              <input
+                type="text"
+                value={inviteName}
+                onChange={(e) => setInviteName(e.target.value)}
+                required
+                className="rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-status-good"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block font-mono text-xs uppercase tracking-wide text-text-muted">Email</span>
+              <input
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                required
+                className="rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-status-good"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={inviting}
+              className="rounded-md bg-status-good px-4 py-2 font-medium text-bg transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {inviting ? 'Sending…' : 'Send invite'}
+            </button>
+          </form>
+        </section>
 
         <section className="mb-8">
           <h2 className="mb-3 font-sans text-sm font-semibold uppercase tracking-wide text-text-muted">
