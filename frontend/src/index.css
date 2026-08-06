@@ -1,0 +1,40 @@
+@import "tailwindcss";
+@import "@fontsource/space-grotesk/500.css";
+@import "@fontsource/space-grotesk/600.css";
+@import "@fontsource/space-grotesk/700.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+
+/* Dark "systems dashboard" aesthetic — this product has one visual mode, it
+   doesn't follow the OS light/dark preference. */
+@theme {
+  --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  --color-bg: #0a0b0f;
+  --color-surface: #13151b;
+  --color-surface-hover: #1a1d25;
+  --color-border: #262a33;
+  --color-text: #e4e6eb;
+  --color-text-muted: #8b8f9a;
+
+  /* The only three status colors this product uses, per the design language
+     spec: teal = good/present, amber = warning/late, slate = neutral/inactive. */
+  --color-status-good: #2dd4bf;
+  --color-status-good-bg: rgb(45 212 191 / 0.12);
+  --color-status-warning: #f59e0b;
+  --color-status-warning-bg: rgb(245 158 11 / 0.12);
+  --color-status-neutral: #64748b;
+  --color-status-neutral-bg: rgb(100 116 139 / 0.12);
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+}
