@@ -6,7 +6,12 @@ from app.dependencies import get_service_role_client, get_user_client, require_a
 from app.repositories.attendance import AttendanceRepository
 from app.schemas.attendance import TeamAttendanceRecord
 from app.schemas.auth import InviteRequest, UserProfile
-from app.services.invites_service import InviteEmailInUseError, InviteFailedError, InvitesService
+from app.services.invites_service import (
+    InviteEmailInUseError,
+    InviteFailedError,
+    InviteRateLimitedError,
+    InvitesService,
+)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -34,5 +39,9 @@ def invite_staff(
         )
     except InviteEmailInUseError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, "That email is already registered") from exc
+    except InviteRateLimitedError as exc:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS, "Too many invite emails sent recently — try again shortly"
+        ) from exc
     except InviteFailedError as exc:
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to create staff profile") from exc

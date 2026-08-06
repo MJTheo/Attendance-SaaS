@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
-import { api, ApiError, type Correction, type TeamAttendanceRecord, type UserProfile } from '../lib/api'
+import { api, type Correction, type TeamAttendanceRecord, type UserProfile } from '../lib/api'
 import { Header } from '../components/Header'
 import { StatusDot, statusToVariant } from '../components/StatusDot'
 import { CorrectionsList } from '../components/CorrectionsList'
@@ -69,11 +69,9 @@ export function Team() {
       setInviteEmail('')
       setInviteName('')
     } catch (err) {
-      if (err instanceof ApiError && err.status === 409) {
-        setInviteError('That email is already registered')
-      } else {
-        setInviteError(err instanceof Error ? err.message : 'Failed to send invite')
-      }
+      // The backend's detail message is already specific (already registered,
+      // rate limited, etc.) — surface it as-is rather than re-classifying by status.
+      setInviteError(err instanceof Error ? err.message : 'Failed to send invite')
     } finally {
       setInviting(false)
     }

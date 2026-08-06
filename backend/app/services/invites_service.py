@@ -7,6 +7,10 @@ class InviteEmailInUseError(Exception):
     pass
 
 
+class InviteRateLimitedError(Exception):
+    pass
+
+
 class InviteFailedError(Exception):
     pass
 
@@ -29,7 +33,11 @@ class InvitesService:
                 email, {"redirect_to": redirect_to}
             )
         except AuthApiError as exc:
-            raise InviteEmailInUseError() from exc
+            if exc.code == "email_exists":
+                raise InviteEmailInUseError() from exc
+            if exc.code == "over_email_send_rate_limit":
+                raise InviteRateLimitedError() from exc
+            raise InviteFailedError(str(exc)) from exc
 
         try:
             return UsersRepository(self._user_client).create(
