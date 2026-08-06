@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.config import get_settings
 from app.core.security import CurrentUser, decode_current_user
 from app.dependencies import get_service_role_client, require_profile
 from app.repositories.users import UsersRepository
 from app.schemas.auth import SignupRequest, UserProfile
 from app.services.auth_service import (
     AuthService,
+    InvalidAccessCodeError,
     MissingEmailClaimError,
     OrgAlreadyProvisionedError,
 )
@@ -18,15 +20,19 @@ def signup(payload: SignupRequest, current_user: CurrentUser = Depends(decode_cu
     """Provisions a new org + first admin for an already-authenticated Supabase
     identity. The frontend must call supabase.auth.signUp() first to create
     the auth identity and obtain the access token sent here."""
+    settings = get_settings()
     service_client = get_service_role_client()
-    auth_service = AuthService(service_client)
+    auth_service = AuthService(service_client, settings.signup_access_code)
     try:
         auth_service.signup_organization(
             user_id=current_user.id,
             email=current_user.email,
             org_name=payload.org_name,
             admin_name=payload.admin_name,
+            access_code=payload.access_code,
         )
+    except InvalidAccessCodeError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Invalid access code") from exc
     except MissingEmailClaimError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Token has no email claim") from exc
     except OrgAlreadyProvisionedError as exc:

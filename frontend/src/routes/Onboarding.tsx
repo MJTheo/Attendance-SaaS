@@ -5,6 +5,7 @@ import { AuthLayout, ErrorText, FormField, SubmitButton } from './AuthLayout'
 export function Onboarding({ onDone }: { onDone: (profile: UserProfile) => void }) {
   const [orgName, setOrgName] = useState('')
   const [adminName, setAdminName] = useState('')
+  const [accessCode, setAccessCode] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -13,7 +14,7 @@ export function Onboarding({ onDone }: { onDone: (profile: UserProfile) => void 
     setError(null)
     setSubmitting(true)
     try {
-      const profile = await api.signup(orgName, adminName)
+      const profile = await api.signup(orgName, adminName, accessCode)
       onDone(profile)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Setup failed')
@@ -36,6 +37,12 @@ export function Onboarding({ onDone }: { onDone: (profile: UserProfile) => void 
           label="Your name"
           value={adminName}
           onChange={(e) => setAdminName(e.target.value)}
+          required
+        />
+        <FormField
+          label="Access code"
+          value={accessCode}
+          onChange={(e) => setAccessCode(e.target.value)}
           required
         />
         <SubmitButton disabled={submitting}>{submitting ? 'Creating…' : 'Create organization'}</SubmitButton>

@@ -121,10 +121,10 @@ export interface Correction {
 // All status/streak/pattern computation happens server-side (architecture
 // rule 3) — this client only fetches and renders what the API returns.
 export const api = {
-  signup: (orgName: string, adminName: string) =>
+  signup: (orgName: string, adminName: string, accessCode: string) =>
     apiFetch<UserProfile>('/auth/signup', {
       method: 'POST',
-      body: JSON.stringify({ org_name: orgName, admin_name: adminName }),
+      body: JSON.stringify({ org_name: orgName, admin_name: adminName, access_code: accessCode }),
     }),
   me: () => apiFetch<UserProfile>('/auth/me'),
   clockIn: () => apiFetch<AttendanceRecord>('/attendance/clock-in', { method: 'POST' }),

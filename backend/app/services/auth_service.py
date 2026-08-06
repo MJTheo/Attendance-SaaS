@@ -11,15 +11,25 @@ class MissingEmailClaimError(Exception):
     pass
 
 
+class InvalidAccessCodeError(Exception):
+    pass
+
+
 class AuthService:
     """Provisions the org + admin profile row after Supabase Auth has already
     created the underlying auth identity. Always constructed with the
     service-role client — see get_service_role_client for why."""
 
-    def __init__(self, service_client: Client):
+    def __init__(self, service_client: Client, signup_access_code: str):
         self._client = service_client
+        self._signup_access_code = signup_access_code
 
-    def signup_organization(self, user_id: str, email: str | None, org_name: str, admin_name: str) -> dict:
+    def signup_organization(
+        self, user_id: str, email: str | None, org_name: str, admin_name: str, access_code: str
+    ) -> dict:
+        if access_code != self._signup_access_code:
+            raise InvalidAccessCodeError()
+
         if not email:
             raise MissingEmailClaimError()
 

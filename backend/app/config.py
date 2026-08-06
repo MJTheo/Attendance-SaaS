@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     # or Supabase silently ignores it and falls back to the Site URL.
     frontend_url: str = "http://localhost:5173"
     report_schedule_cron: str = "0 6 * * 1"
+    # Required to create a new organization via /auth/signup. Keeps the public
+    # demo/portfolio deployment from letting random visitors spin up real orgs
+    # — the signup UI still exists, it just requires knowing this value.
+    signup_access_code: str
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

@@ -10,6 +10,7 @@ export function SignUp() {
   const [password, setPassword] = useState('')
   const [orgName, setOrgName] = useState('')
   const [adminName, setAdminName] = useState('')
+  const [accessCode, setAccessCode] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pendingConfirmation, setPendingConfirmation] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -31,7 +32,7 @@ export function SignUp() {
         return
       }
 
-      await api.signup(orgName, adminName)
+      await api.signup(orgName, adminName, accessCode)
       navigate('/', { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign up failed')
@@ -83,6 +84,12 @@ export function SignUp() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           minLength={6}
+          required
+        />
+        <FormField
+          label="Access code"
+          value={accessCode}
+          onChange={(e) => setAccessCode(e.target.value)}
           required
         />
         <SubmitButton disabled={submitting}>{submitting ? 'Creating…' : 'Create organization'}</SubmitButton>

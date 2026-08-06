@@ -4,6 +4,7 @@ from pydantic import BaseModel
 class SignupRequest(BaseModel):
     org_name: str
     admin_name: str
+    access_code: str
 
 
 class InviteRequest(BaseModel):

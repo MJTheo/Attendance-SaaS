@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { DEMO_ADMIN_EMAIL, DEMO_ADMIN_PASSWORD } from '../lib/demo'
 import { AuthLayout, ErrorText, FormField, SubmitButton } from './AuthLayout'
@@ -80,13 +80,6 @@ export function SignIn() {
       >
         {demoSubmitting ? 'Loading demo…' : 'View live demo'}
       </button>
-
-      <p className="mt-4 font-mono text-xs text-text-muted">
-        No account yet?{' '}
-        <Link to="/signup" className="text-status-good">
-          Create an organization
-        </Link>
-      </p>
     </AuthLayout>
   )
 }
