@@ -14,7 +14,11 @@ def compute_streak(records: list[dict]) -> int:
     """Consecutive most-recent calendar days with at least one non-absent
     record, no gaps. Grounded only in records that actually exist — there's
     no shift-schedule concept yet (see AttendanceService._determine_clock_in_status),
-    so a day with no record at all isn't assumed to be a missed workday."""
+    so a day with no record at all isn't assumed to be a missed workday,
+    with one narrow exception: weekends (Sat/Sun) are skipped when checking
+    for a gap rather than treated as a missed day, since assuming *every*
+    day is a workday is itself an unstated schedule assumption — and the
+    wrong one for the common case."""
     dates_seen: set[date] = set()
     attended_dates: set[date] = set()
     for record in records:
@@ -28,8 +32,13 @@ def compute_streak(records: list[dict]) -> int:
 
     streak = 0
     cursor = max(dates_seen)
-    while cursor in attended_dates:
-        streak += 1
+    while True:
+        if cursor in attended_dates:
+            streak += 1
+        elif cursor.weekday() >= 5:
+            pass  # weekend with nothing recorded — not a gap, keep walking back
+        else:
+            break
         cursor -= timedelta(days=1)
     return streak
 
