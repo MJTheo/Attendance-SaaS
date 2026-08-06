@@ -64,6 +64,46 @@ export interface CorrectionFields {
   notes?: string
 }
 
+export interface StreakResponse {
+  current_streak: number
+}
+
+export interface UserAnalyticsSummary {
+  user_id: string
+  name: string
+  present: number
+  late: number
+  early_leave: number
+  absent: number
+  total: number
+  late_rate: number
+}
+
+export interface WeekdayLateRate {
+  weekday: string
+  total: number
+  late: number
+  late_rate: number
+}
+
+export interface TeamAnalytics {
+  users: UserAnalyticsSummary[]
+  by_weekday: WeekdayLateRate[]
+}
+
+export interface Report {
+  id: string
+  org_id: string
+  type: string
+  generated_at: string
+  payload: {
+    period_start: string
+    period_end: string
+    org_totals: { present: number; late: number; early_leave: number; absent: number; total_records: number }
+    users: UserAnalyticsSummary[]
+  }
+}
+
 export interface Correction {
   id: string
   attendance_record_id: string
@@ -108,4 +148,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ email, name }),
     }),
+  streak: () => apiFetch<StreakResponse>('/attendance/streak'),
+  analytics: () => apiFetch<TeamAnalytics>('/admin/analytics'),
+  reports: () => apiFetch<Report[]>('/admin/reports'),
 }

@@ -12,6 +12,7 @@ export function Dashboard() {
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
   const [history, setHistory] = useState<AttendanceRecord[]>([])
   const [corrections, setCorrections] = useState<Correction[]>([])
+  const [streak, setStreak] = useState(0)
   const [loading, setLoading] = useState(true)
   const [actionError, setActionError] = useState<string | null>(null)
   const [actionPending, setActionPending] = useState(false)
@@ -19,7 +20,9 @@ export function Dashboard() {
   const [correctingRecordId, setCorrectingRecordId] = useState<string | null>(null)
 
   const loadHistory = useCallback(async () => {
-    setHistory(await api.history())
+    const [historyData, streakData] = await Promise.all([api.history(), api.streak()])
+    setHistory(historyData)
+    setStreak(streakData.current_streak)
   }, [])
 
   const loadCorrections = useCallback(async () => {
@@ -116,9 +119,14 @@ export function Dashboard() {
               variant={openRecord ? 'good' : 'neutral'}
               label={openRecord ? 'Clocked in' : 'Not clocked in'}
             />
-            {openRecord && (
-              <span className="font-mono text-xs text-text-muted">since {formatTimestamp(openRecord.clock_in)}</span>
-            )}
+            <div className="flex items-center gap-4">
+              {openRecord && (
+                <span className="font-mono text-xs text-text-muted">since {formatTimestamp(openRecord.clock_in)}</span>
+              )}
+              <span className="font-mono text-xs text-text-muted">
+                Streak: <span className="text-status-good">{streak}</span> {streak === 1 ? 'day' : 'days'}
+              </span>
+            </div>
           </div>
 
           {actionError && <p className="mb-4 font-mono text-sm text-status-warning">{actionError}</p>}

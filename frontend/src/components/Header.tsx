@@ -15,9 +15,14 @@ export function Header({ profile }: { profile: UserProfile }) {
             Dashboard
           </Link>
           {profile.role === 'admin' && (
-            <Link to="/team" className="text-text-muted hover:text-text">
-              Team
-            </Link>
+            <>
+              <Link to="/team" className="text-text-muted hover:text-text">
+                Team
+              </Link>
+              <Link to="/analytics" className="text-text-muted hover:text-text">
+                Analytics
+              </Link>
+            </>
           )}
         </nav>
       </div>

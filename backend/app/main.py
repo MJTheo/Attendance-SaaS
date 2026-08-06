@@ -1,12 +1,34 @@
+from contextlib import asynccontextmanager
+
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
+from app.dependencies import get_service_role_client
+from app.jobs.reports import generate_weekly_reports
 from app.routers import admin, attendance, auth, corrections
 
 settings = get_settings()
 
-app = FastAPI(title="Attendance SaaS API")
+scheduler = BackgroundScheduler()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    scheduler.add_job(
+        lambda: generate_weekly_reports(get_service_role_client()),
+        CronTrigger.from_crontab(settings.report_schedule_cron),
+        id="weekly_reports",
+        replace_existing=True,
+    )
+    scheduler.start()
+    yield
+    scheduler.shutdown()
+
+
+app = FastAPI(title="Attendance SaaS API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
