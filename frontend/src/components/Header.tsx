@@ -1,11 +1,13 @@
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { UserProfile } from '../lib/api'
+import { Brand } from './Brand'
 
 export function Header({ profile }: { profile: UserProfile }) {
   return (
     <header className="flex items-center justify-between border-b border-border px-6 py-4">
       <div className="flex items-center gap-6">
+        <Brand className="border-r border-border pr-6" />
         <div>
           <p className="font-sans text-lg font-semibold text-text">{profile.name}</p>
           <p className="font-mono text-xs uppercase tracking-wide text-text-muted">{profile.role}</p>

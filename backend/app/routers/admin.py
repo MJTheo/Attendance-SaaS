@@ -10,6 +10,7 @@ from app.schemas.attendance import TeamAttendanceRecord
 from app.schemas.auth import InviteRequest, UserProfile
 from app.services.analytics_service import late_rate_by_weekday, summarize_users
 from app.services.invites_service import (
+    DemoOrgInviteBlockedError,
     InviteEmailInUseError,
     InviteFailedError,
     InviteRateLimitedError,
@@ -65,3 +66,5 @@ def invite_staff(
         ) from exc
     except InviteFailedError as exc:
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to create staff profile") from exc
+    except DemoOrgInviteBlockedError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Invites are disabled for the demo organization") from exc

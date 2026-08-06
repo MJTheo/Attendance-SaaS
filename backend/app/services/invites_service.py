@@ -15,6 +15,10 @@ class InviteFailedError(Exception):
     pass
 
 
+class DemoOrgInviteBlockedError(Exception):
+    pass
+
+
 class InvitesService:
     """Invites a new staff member. Creating the underlying Supabase Auth
     identity requires the admin API (service-role client) — ordinary users
@@ -28,6 +32,14 @@ class InvitesService:
         self._service_client = service_client
 
     def invite_staff(self, org_id: str, email: str, name: str, redirect_to: str) -> dict:
+        # The public demo org's admin login is shared/public — invite_user_by_email
+        # sends a real email to whatever address is typed in, so this is blocked
+        # server-side, not just hidden in the UI (a hidden button doesn't stop
+        # someone from calling the API directly).
+        org_rows = self._user_client.table("organizations").select("plan").eq("id", org_id).limit(1).execute().data
+        if org_rows and org_rows[0]["plan"] == "demo":
+            raise DemoOrgInviteBlockedError()
+
         try:
             invited = self._service_client.auth.admin.invite_user_by_email(
                 email, {"redirect_to": redirect_to}
