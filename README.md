@@ -1,5 +1,7 @@
 # Attendance SaaS
 
+**Status: v0.1.0-alpha** — all four planned build phases (foundation, corrections, analytics, polish) are deployed and live at the demo link below. Pre-1.0: expect schema and API shape to still move.
+
 A multi-tenant workforce attendance system: organizations sign up, staff clock in/out, corrections go through an auditable approval workflow, and admins get team-wide attendance analytics.
 
 This is a rebuild of a Google Apps Script attendance tool that ran in production for 30+ daily users — same business logic, given a real backend, database, and multi-tenant architecture.
