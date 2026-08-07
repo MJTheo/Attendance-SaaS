@@ -169,7 +169,7 @@ export function Team() {
             Team attendance
           </h2>
           <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full border-collapse font-mono text-sm">
+            <table className="w-full border-collapse whitespace-nowrap font-mono text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-text-muted">
                   <th className="px-2 py-2 font-normal sm:px-4">Status</th>
