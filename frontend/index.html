@@ -6,6 +6,13 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Attendance</title>
     <meta name="description" content="Multi-tenant workforce attendance and clock-in tracking." />
+    <script>
+      // Runs before first paint to avoid a flash of the wrong theme —
+      // must stay in sync with lib/theme.ts's storage key and values.
+      if (localStorage.getItem('attendance-theme') === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light')
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

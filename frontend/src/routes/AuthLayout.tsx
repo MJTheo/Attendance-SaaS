@@ -1,11 +1,13 @@
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react'
 import { Brand } from '../components/Brand'
+import { ThemeToggle } from '../components/ThemeToggle'
 
 export function AuthLayout({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 px-4">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-6 px-4 py-10">
+      <ThemeToggle className="fixed right-4 top-4" />
       <Brand />
-      <div className="w-full max-w-sm rounded-lg border border-border bg-surface p-8">
+      <div className="w-full max-w-sm rounded-lg border border-border bg-surface p-6 sm:p-8">
         <h1 className="mb-6 font-sans text-xl font-semibold text-text">{title}</h1>
         {children}
       </div>

@@ -97,17 +97,17 @@ export function Team() {
     <div className="min-h-screen">
       <Header profile={profile} />
 
-      <main className="mx-auto max-w-4xl px-6 py-8">
+      <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
         {error && <p className="mb-4 font-mono text-sm text-status-warning">{error}</p>}
 
         {profile.email !== DEMO_ADMIN_EMAIL && (
-          <section className="mb-8 rounded-lg border border-border bg-surface p-6">
+          <section className="mb-8 rounded-lg border border-border bg-surface p-4 sm:p-6">
             <h2 className="mb-3 font-sans text-sm font-semibold uppercase tracking-wide text-text-muted">
               Invite staff
             </h2>
             {inviteError && <p className="mb-3 font-mono text-xs text-status-warning">{inviteError}</p>}
             {inviteSuccess && <p className="mb-3 font-mono text-xs text-status-good">{inviteSuccess}</p>}
-            <form onSubmit={handleInvite} className="flex flex-wrap items-end gap-3">
+            <form onSubmit={handleInvite} className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
               <label className="block">
                 <span className="mb-1 block font-mono text-xs uppercase tracking-wide text-text-muted">Name</span>
                 <input
@@ -115,7 +115,7 @@ export function Team() {
                   value={inviteName}
                   onChange={(e) => setInviteName(e.target.value)}
                   required
-                  className="rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-status-good"
+                  className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-status-good sm:w-auto"
                 />
               </label>
               <label className="block">
@@ -125,7 +125,7 @@ export function Team() {
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
                   required
-                  className="rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-status-good"
+                  className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-status-good sm:w-auto"
                 />
               </label>
               <button
@@ -172,11 +172,11 @@ export function Team() {
             <table className="w-full border-collapse font-mono text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-text-muted">
-                  <th className="px-4 py-2 font-normal">Status</th>
-                  <th className="px-4 py-2 font-normal">Name</th>
-                  <th className="px-4 py-2 font-normal">Clock in</th>
-                  <th className="px-4 py-2 font-normal">Clock out</th>
-                  <th className="px-4 py-2 font-normal">Notes</th>
+                  <th className="px-2 py-2 font-normal sm:px-4">Status</th>
+                  <th className="px-2 py-2 font-normal sm:px-4">Name</th>
+                  <th className="px-2 py-2 font-normal sm:px-4">Clock in</th>
+                  <th className="px-2 py-2 font-normal sm:px-4">Clock out</th>
+                  <th className="px-2 py-2 font-normal sm:px-4">Notes</th>
                 </tr>
               </thead>
               <tbody>
@@ -189,13 +189,13 @@ export function Team() {
                 )}
                 {records.map((record) => (
                   <tr key={record.id} className="border-b border-border last:border-0">
-                    <td className="px-4 py-2">
+                    <td className="px-2 py-2 sm:px-4">
                       <StatusDot variant={statusToVariant(record.status)} label={record.status} />
                     </td>
-                    <td className="px-4 py-2 text-text">{record.user_name}</td>
-                    <td className="px-4 py-2 text-text">{formatTimestamp(record.clock_in)}</td>
-                    <td className="px-4 py-2 text-text">{formatTimestamp(record.clock_out)}</td>
-                    <td className="px-4 py-2 text-text-muted">{record.notes ?? '—'}</td>
+                    <td className="px-2 py-2 text-text sm:px-4">{record.user_name}</td>
+                    <td className="px-2 py-2 text-text sm:px-4">{formatTimestamp(record.clock_in)}</td>
+                    <td className="px-2 py-2 text-text sm:px-4">{formatTimestamp(record.clock_out)}</td>
+                    <td className="px-2 py-2 text-text-muted sm:px-4">{record.notes ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>

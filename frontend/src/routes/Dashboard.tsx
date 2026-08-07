@@ -112,14 +112,14 @@ export function Dashboard() {
     <div className="min-h-screen">
       <Header profile={profile} />
 
-      <main className="mx-auto max-w-2xl px-6 py-8">
-        <section className="mb-8 rounded-lg border border-border bg-surface p-6">
-          <div className="mb-4 flex items-center justify-between">
+      <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-8">
+        <section className="mb-8 rounded-lg border border-border bg-surface p-4 sm:p-6">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-y-2">
             <StatusDot
               variant={openRecord ? 'good' : 'neutral'}
               label={openRecord ? 'Clocked in' : 'Not clocked in'}
             />
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
               {openRecord && (
                 <span className="font-mono text-xs text-text-muted">since {formatTimestamp(openRecord.clock_in)}</span>
               )}
@@ -132,7 +132,7 @@ export function Dashboard() {
           {actionError && <p className="mb-4 font-mono text-sm text-status-warning">{actionError}</p>}
 
           {openRecord ? (
-            <div className="flex gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <input
                 type="text"
                 placeholder="Note (optional)"
@@ -167,11 +167,11 @@ export function Dashboard() {
             <table className="w-full border-collapse font-mono text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-text-muted">
-                  <th className="px-4 py-2 font-normal">Status</th>
-                  <th className="px-4 py-2 font-normal">Clock in</th>
-                  <th className="px-4 py-2 font-normal">Clock out</th>
-                  <th className="px-4 py-2 font-normal">Notes</th>
-                  <th className="px-4 py-2 font-normal"></th>
+                  <th className="px-2 py-2 font-normal sm:px-4">Status</th>
+                  <th className="px-2 py-2 font-normal sm:px-4">Clock in</th>
+                  <th className="px-2 py-2 font-normal sm:px-4">Clock out</th>
+                  <th className="px-2 py-2 font-normal sm:px-4">Notes</th>
+                  <th className="px-2 py-2 font-normal sm:px-4"></th>
                 </tr>
               </thead>
               <tbody>
@@ -185,13 +185,13 @@ export function Dashboard() {
                 {history.map((record) => (
                   <Fragment key={record.id}>
                     <tr className="border-b border-border last:border-0">
-                      <td className="px-4 py-2">
+                      <td className="px-2 py-2 sm:px-4">
                         <StatusDot variant={statusToVariant(record.status)} label={record.status} />
                       </td>
-                      <td className="px-4 py-2 text-text">{formatTimestamp(record.clock_in)}</td>
-                      <td className="px-4 py-2 text-text">{formatTimestamp(record.clock_out)}</td>
-                      <td className="px-4 py-2 text-text-muted">{record.notes ?? '—'}</td>
-                      <td className="px-4 py-2 text-right">
+                      <td className="px-2 py-2 text-text sm:px-4">{formatTimestamp(record.clock_in)}</td>
+                      <td className="px-2 py-2 text-text sm:px-4">{formatTimestamp(record.clock_out)}</td>
+                      <td className="px-2 py-2 text-text-muted sm:px-4">{record.notes ?? '—'}</td>
+                      <td className="px-2 py-2 text-right sm:px-4">
                         <button
                           onClick={() => setCorrectingRecordId(correctingRecordId === record.id ? null : record.id)}
                           className="font-mono text-xs text-text-muted hover:text-text"

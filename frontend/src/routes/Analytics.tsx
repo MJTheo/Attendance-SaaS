@@ -51,7 +51,7 @@ export function Analytics() {
     <div className="min-h-screen">
       <Header profile={profile} />
 
-      <main className="mx-auto max-w-4xl px-6 py-8">
+      <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
         {error && <p className="mb-4 font-mono text-sm text-status-warning">{error}</p>}
 
         <section className="mb-8">
@@ -62,12 +62,12 @@ export function Analytics() {
             <table className="w-full border-collapse font-mono text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-text-muted">
-                  <th className="px-4 py-2 font-normal">Name</th>
-                  <th className="px-4 py-2 font-normal">Present</th>
-                  <th className="px-4 py-2 font-normal">Late</th>
-                  <th className="px-4 py-2 font-normal">Early leave</th>
-                  <th className="px-4 py-2 font-normal">Absent</th>
-                  <th className="px-4 py-2 font-normal">Late rate</th>
+                  <th className="px-2 py-2 font-normal sm:px-4">Name</th>
+                  <th className="px-2 py-2 font-normal sm:px-4">Present</th>
+                  <th className="px-2 py-2 font-normal sm:px-4">Late</th>
+                  <th className="px-2 py-2 font-normal sm:px-4">Early leave</th>
+                  <th className="px-2 py-2 font-normal sm:px-4">Absent</th>
+                  <th className="px-2 py-2 font-normal sm:px-4">Late rate</th>
                 </tr>
               </thead>
               <tbody>
@@ -80,12 +80,12 @@ export function Analytics() {
                 )}
                 {analytics?.users.map((u) => (
                   <tr key={u.user_id} className="border-b border-border last:border-0">
-                    <td className="px-4 py-2 text-text">{u.name}</td>
-                    <td className="px-4 py-2 text-text">{u.present}</td>
-                    <td className="px-4 py-2 text-text">{u.late}</td>
-                    <td className="px-4 py-2 text-text">{u.early_leave}</td>
-                    <td className="px-4 py-2 text-text">{u.absent}</td>
-                    <td className="px-4 py-2 text-text">{formatPct(u.late_rate)}</td>
+                    <td className="px-2 py-2 text-text sm:px-4">{u.name}</td>
+                    <td className="px-2 py-2 text-text sm:px-4">{u.present}</td>
+                    <td className="px-2 py-2 text-text sm:px-4">{u.late}</td>
+                    <td className="px-2 py-2 text-text sm:px-4">{u.early_leave}</td>
+                    <td className="px-2 py-2 text-text sm:px-4">{u.absent}</td>
+                    <td className="px-2 py-2 text-text sm:px-4">{formatPct(u.late_rate)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -101,19 +101,19 @@ export function Analytics() {
             <table className="w-full border-collapse font-mono text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-text-muted">
-                  <th className="px-4 py-2 font-normal">Weekday</th>
-                  <th className="px-4 py-2 font-normal">Records</th>
-                  <th className="px-4 py-2 font-normal">Late</th>
-                  <th className="px-4 py-2 font-normal">Late rate</th>
+                  <th className="px-2 py-2 font-normal sm:px-4">Weekday</th>
+                  <th className="px-2 py-2 font-normal sm:px-4">Records</th>
+                  <th className="px-2 py-2 font-normal sm:px-4">Late</th>
+                  <th className="px-2 py-2 font-normal sm:px-4">Late rate</th>
                 </tr>
               </thead>
               <tbody>
                 {analytics?.by_weekday.map((w) => (
                   <tr key={w.weekday} className="border-b border-border last:border-0">
-                    <td className="px-4 py-2 text-text">{w.weekday}</td>
-                    <td className="px-4 py-2 text-text-muted">{w.total}</td>
-                    <td className="px-4 py-2 text-text-muted">{w.late}</td>
-                    <td className="px-4 py-2 text-text">{w.total > 0 ? formatPct(w.late_rate) : '—'}</td>
+                    <td className="px-2 py-2 text-text sm:px-4">{w.weekday}</td>
+                    <td className="px-2 py-2 text-text-muted sm:px-4">{w.total}</td>
+                    <td className="px-2 py-2 text-text-muted sm:px-4">{w.late}</td>
+                    <td className="px-2 py-2 text-text sm:px-4">{w.total > 0 ? formatPct(w.late_rate) : '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -133,7 +133,7 @@ export function Analytics() {
             <div className="flex flex-col gap-3">
               {reports.map((r) => (
                 <div key={r.id} className="rounded-lg border border-border bg-surface p-4">
-                  <div className="mb-2 flex items-center justify-between">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
                     <span className="font-mono text-xs uppercase tracking-wide text-text-muted">{r.type}</span>
                     <span className="font-mono text-xs text-text-muted">{formatTimestamp(r.generated_at)}</span>
                   </div>
