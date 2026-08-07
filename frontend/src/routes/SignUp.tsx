@@ -90,6 +90,9 @@ export function SignUp() {
           label="Access code"
           value={accessCode}
           onChange={(e) => setAccessCode(e.target.value)}
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          placeholder="6-digit code from your authenticator app"
           required
         />
         <SubmitButton disabled={submitting}>{submitting ? 'Creating…' : 'Create organization'}</SubmitButton>

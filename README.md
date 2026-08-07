@@ -38,6 +38,7 @@ The non-negotiable rules this project was built around:
 - **No shift-schedule config exists yet**, so there's nothing to compare a clock-in time against. Every clock-in defaults to `present`; `late`/`early_leave`/`absent` only ever appear via an admin-approved correction. Streak and pattern analytics are computed only from records that actually exist — a day with no record isn't assumed to be a missed workday, since there's no concept of which days someone was scheduled to work.
 - **Supabase's free-tier mailer has a low email rate limit** (a couple of sends/hour). The invite endpoint distinguishes that from "email already registered" and returns a proper 429, but real production use would want a custom SMTP provider configured in Supabase to lift it.
 - **The demo account is a shared, mutable login**, not a read-only sandbox — simplest way to let a visitor explore the real app (real RLS, real API, real writes) without a signup step.
+- **Creating a new org requires a TOTP access code** (`/auth/signup`'s "Access code" field), same rotating-code mechanism as an authenticator app — keeps a public deployment from letting random visitors spin up real orgs, without a static secret sitting in the signup form.
 
 ## Local development
 

@@ -22,7 +22,7 @@ def signup(payload: SignupRequest, current_user: CurrentUser = Depends(decode_cu
     the auth identity and obtain the access token sent here."""
     settings = get_settings()
     service_client = get_service_role_client()
-    auth_service = AuthService(service_client, settings.signup_access_code)
+    auth_service = AuthService(service_client, settings.signup_totp_secret)
     try:
         auth_service.signup_organization(
             user_id=current_user.id,

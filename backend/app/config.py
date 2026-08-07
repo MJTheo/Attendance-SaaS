@@ -20,10 +20,11 @@ class Settings(BaseSettings):
     # or Supabase silently ignores it and falls back to the Site URL.
     frontend_url: str = "http://localhost:5173"
     report_schedule_cron: str = "0 6 * * 1"
-    # Required to create a new organization via /auth/signup. Keeps the public
-    # demo/portfolio deployment from letting random visitors spin up real orgs
-    # — the signup UI still exists, it just requires knowing this value.
-    signup_access_code: str
+    # TOTP seed (base32) required to create a new organization via /auth/signup.
+    # The valid code rotates every 30s, same mechanism as an authenticator app
+    # — nothing static for the frontend to leak. Generate with
+    # `python -c "import pyotp; print(pyotp.random_base32())"`.
+    signup_totp_secret: str
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
