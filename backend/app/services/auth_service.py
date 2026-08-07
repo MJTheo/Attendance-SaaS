@@ -28,9 +28,11 @@ class AuthService:
     def signup_organization(
         self, user_id: str, email: str | None, org_name: str, admin_name: str, access_code: str
     ) -> dict:
-        # valid_window=1 tolerates a small amount of clock drift / submit lag
-        # by also accepting the code from one 30s step before or after now.
-        if not self._totp.verify(access_code, valid_window=1):
+        # valid_window=6 accepts a code up to ~3 minutes old (or new) on either
+        # side of now (each step is 30s) — wide enough that a code can be
+        # handed to someone else without both parties acting within 30s, while
+        # still expiring on a short enough horizon to matter as a gate.
+        if not self._totp.verify(access_code, valid_window=6):
             raise InvalidAccessCodeError()
 
         if not email:
