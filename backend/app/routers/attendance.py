@@ -13,6 +13,7 @@ from app.schemas.attendance import AttendanceRecord, ClockOutRequest
 from app.services.analytics_service import build_personal_calendar, compute_streak, day_detail_for_user, month_bounds
 from app.services.attendance_service import (
     AlreadyClockedInError,
+    AlreadyClockedTodayError,
     AttendanceService,
     NoOpenRecordError,
 )
@@ -31,6 +32,10 @@ def clock_in(
         return service.clock_in(profile["org_id"], current_user.id)
     except AlreadyClockedInError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, "Already clocked in") from exc
+    except AlreadyClockedTodayError as exc:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Already clocked in and out today — request a correction if this was a mistake"
+        ) from exc
 
 
 @router.patch("/clock-out", response_model=AttendanceRecord)

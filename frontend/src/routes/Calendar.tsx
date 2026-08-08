@@ -32,6 +32,8 @@ function DayDetailBody({ detail }: { detail: DayDetail }) {
       <StatusDot variant={calendarStatusToVariant(detail.status)} label={STATUS_LABEL[detail.status]} />
       {detail.leave_type ? (
         <p className="mt-2 font-mono text-sm text-text">{detail.leave_reason}</p>
+      ) : detail.status === 'absent' ? (
+        <p className="mt-2 font-mono text-sm text-text-muted">No attendance recorded for this day.</p>
       ) : (
         <div className="mt-2 flex flex-col gap-1 font-mono text-sm text-text">
           <span>Clock in: {formatTime(detail.clock_in)}</span>
@@ -58,7 +60,7 @@ function TeamDayDetailBody({ details }: { details: TeamDayDetail[] }) {
           </div>
           {detail.leave_type ? (
             <p className="font-mono text-xs text-text-muted">{detail.leave_reason}</p>
-          ) : detail.clock_in ? (
+          ) : detail.status === 'absent' ? null : detail.clock_in ? (
             <p className="font-mono text-xs text-text-muted">
               {formatTime(detail.clock_in)} – {detail.clock_out ? formatTime(detail.clock_out) : 'still clocked in'}
               {detail.notes ? ` · ${detail.notes}` : ''}
@@ -75,6 +77,7 @@ const STATUS_LABEL: Record<CalendarStatus, string> = {
   late: 'Late',
   early_leave: 'Early leave',
   absent: 'Absent',
+  missed_clockout: 'Missed clock-out',
   sick_leave: 'Sick leave',
   annual_leave: 'Annual leave',
 }
@@ -401,7 +404,9 @@ export function Calendar() {
         )}
 
         <div className="mt-6 flex flex-wrap gap-x-4 gap-y-2 font-mono text-xs text-text-muted">
-          {(['present', 'late', 'early_leave', 'absent', 'sick_leave', 'annual_leave'] as CalendarStatus[]).map(
+          {(
+            ['present', 'late', 'early_leave', 'missed_clockout', 'absent', 'sick_leave', 'annual_leave'] as CalendarStatus[]
+          ).map(
             (status) => (
               <span key={status} className="flex items-center gap-1.5">
                 <span className={`h-2 w-2 rounded-full ${dotColorClass[calendarStatusToVariant(status)]}`} aria-hidden="true" />

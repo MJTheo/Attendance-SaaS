@@ -3,7 +3,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, model_validator
 
-AttendanceStatus = Literal["present", "late", "early_leave", "absent"]
+AttendanceStatus = Literal["present", "late", "early_leave", "absent", "missed_clockout"]
 
 
 class CorrectionFields(BaseModel):

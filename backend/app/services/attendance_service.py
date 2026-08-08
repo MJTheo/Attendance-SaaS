@@ -1,9 +1,13 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.repositories.attendance import AttendanceRepository
 
 
 class AlreadyClockedInError(Exception):
+    pass
+
+
+class AlreadyClockedTodayError(Exception):
     pass
 
 
@@ -29,8 +33,17 @@ class AttendanceService:
     def clock_in(self, org_id: str, user_id: str) -> dict:
         if self._repo.get_open_record(user_id) is not None:
             raise AlreadyClockedInError()
-        now = datetime.now(timezone.utc).isoformat()
-        return self._repo.create_clock_in(org_id, user_id, now, _determine_clock_in_status())
+
+        now = datetime.now(timezone.utc)
+        today_start = datetime.combine(now.date(), datetime.min.time(), tzinfo=timezone.utc)
+        tomorrow_start = today_start + timedelta(days=1)
+        # Capped at one clock-in per day, not just "no currently-open record" —
+        # otherwise clocking out and then accidentally tapping "Clock in"
+        # again minutes later would silently open a second record for today.
+        if self._repo.list_for_user_range(user_id, today_start.isoformat(), tomorrow_start.isoformat()):
+            raise AlreadyClockedTodayError()
+
+        return self._repo.create_clock_in(org_id, user_id, now.isoformat(), _determine_clock_in_status())
 
     def clock_out(self, user_id: str, notes: str | None) -> dict:
         open_record = self._repo.get_open_record(user_id)

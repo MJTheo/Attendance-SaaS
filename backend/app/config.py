@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     # or Supabase silently ignores it and falls back to the Site URL.
     frontend_url: str = "http://localhost:5173"
     report_schedule_cron: str = "0 6 * * 1"
+    # Runs shortly after midnight UTC to finalize the day that just ended:
+    # flags still-open attendance records missed_clockout, auto-creates
+    # absent records for no-shows. See app.jobs.closeout.
+    daily_closeout_cron: str = "10 0 * * *"
     # TOTP seed (base32) required to create a new organization via /auth/signup.
     # The valid code rotates every 30s, same mechanism as an authenticator app
     # — nothing static for the frontend to leak. Generate with

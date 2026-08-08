@@ -49,7 +49,7 @@ export interface AttendanceRecord {
   user_id: string
   clock_in: string
   clock_out: string | null
-  status: 'present' | 'late' | 'early_leave' | 'absent'
+  status: 'present' | 'late' | 'early_leave' | 'absent' | 'missed_clockout'
   notes: string | null
 }
 

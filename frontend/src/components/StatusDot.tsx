@@ -18,6 +18,7 @@ export function statusToVariant(status: AttendanceRecord['status']): DotVariant 
       return 'good'
     case 'late':
     case 'early_leave':
+    case 'missed_clockout':
       return 'warning'
     case 'absent':
       return 'neutral'

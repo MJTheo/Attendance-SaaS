@@ -2,7 +2,13 @@ import { useState, type FormEvent } from 'react'
 import type { AttendanceRecord, CorrectionFields } from '../lib/api'
 import { fromDatetimeLocal, toDatetimeLocal } from '../lib/datetime'
 
-const STATUS_OPTIONS: AttendanceRecord['status'][] = ['present', 'late', 'early_leave', 'absent']
+const STATUS_OPTIONS: AttendanceRecord['status'][] = [
+  'present',
+  'late',
+  'early_leave',
+  'absent',
+  'missed_clockout',
+]
 
 export function CorrectionRequestForm({
   record,

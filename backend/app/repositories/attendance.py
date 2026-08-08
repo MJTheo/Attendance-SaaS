@@ -7,11 +7,18 @@ class AttendanceRepository:
 
     def get_open_record(self, user_id: str) -> dict | None:
         # See UsersRepository.get_profile for why .maybe_single() is avoided.
+        #
+        # status != 'absent' excludes the daily closeout job's auto-created
+        # no-show records: those never had a real clock-in, so they always
+        # carry clock_out = null by design — without this filter, anyone
+        # ever auto-marked absent would look permanently "clocked in" and be
+        # blocked from ever clocking in again.
         response = (
             self._client.table("attendance_records")
             .select("*")
             .eq("user_id", user_id)
             .is_("clock_out", "null")
+            .neq("status", "absent")
             .order("clock_in", desc=True)
             .limit(1)
             .execute()
@@ -83,20 +90,24 @@ class AttendanceRepository:
         )
         return self._flatten_user_name(response.data)
 
-    def list_for_org_range(self, start: str, end: str, limit: int = 5000) -> list[dict]:
+    def list_for_org_range(self, start: str, end: str, limit: int = 5000, org_id: str | None = None) -> list[dict]:
         """clock_in in [start, end) — end is exclusive, pass a day boundary.
         Used by the calendar, the analytics trend chart, and the Team page's
         period-grouped attendance view, so it stays bounded instead of
-        pulling the whole org's history like list_for_org does."""
-        response = (
+        pulling the whole org's history like list_for_org does.
+
+        org_id is only needed when called with the service-role client (RLS
+        isn't there to scope it) — e.g. the daily closeout job, which iterates
+        every org. User-scoped call sites can omit it."""
+        query = (
             self._client.table("attendance_records")
             .select("*, users(name)")
             .gte("clock_in", start)
             .lt("clock_in", end)
-            .order("clock_in", desc=True)
-            .limit(limit)
-            .execute()
         )
+        if org_id is not None:
+            query = query.eq("org_id", org_id)
+        response = query.order("clock_in", desc=True).limit(limit).execute()
         return self._flatten_user_name(response.data)
 
     def list_for_user_range(self, user_id: str, start: str, end: str) -> list[dict]:

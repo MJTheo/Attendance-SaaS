@@ -20,8 +20,13 @@ class UsersRepository:
         )
         return response.data[0]
 
-    def list_for_org(self) -> list[dict]:
+    def list_for_org(self, org_id: str | None = None) -> list[dict]:
         # RLS ("members can view users in their org") scopes this to the
-        # caller's org automatically — no explicit org_id filter needed.
-        response = self._client.table("users").select("*").order("name").execute()
+        # caller's org automatically for a user-scoped client — org_id is
+        # only needed with the service-role client (e.g. the daily closeout
+        # job, which iterates every org).
+        query = self._client.table("users").select("*")
+        if org_id is not None:
+            query = query.eq("org_id", org_id)
+        response = query.order("name").execute()
         return response.data

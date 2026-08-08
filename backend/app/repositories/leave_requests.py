@@ -60,16 +60,21 @@ class LeaveRequestsRepository:
         )
         return response.data[0]
 
-    def list_approved_in_range(self, start: str, end: str) -> list[dict]:
+    def list_approved_in_range(self, start: str, end: str, org_id: str | None = None) -> list[dict]:
         # Overlap test: a leave spans [start_date, end_date] and overlaps the
         # window [start, end] iff it starts on/before the window ends AND
         # ends on/after the window starts.
-        response = (
+        #
+        # org_id is only needed with the service-role client (no RLS to scope
+        # it) — e.g. the daily closeout job.
+        query = (
             self._client.table("leave_requests")
             .select("*")
             .eq("status", "approved")
             .lte("start_date", end)
             .gte("end_date", start)
-            .execute()
         )
+        if org_id is not None:
+            query = query.eq("org_id", org_id)
+        response = query.execute()
         return response.data
