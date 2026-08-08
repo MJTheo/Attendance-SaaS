@@ -216,4 +216,5 @@ export const api = {
     apiFetch<DayStatusCounts[]>(`/admin/calendar?year=${year}&month=${month}`),
   teamMemberCalendar: (userId: string, year: number, month: number) =>
     apiFetch<CalendarDay[]>(`/admin/calendar/${userId}?year=${year}&month=${month}`),
+  teamMembers: () => apiFetch<UserProfile[]>('/admin/users'),
 }

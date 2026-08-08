@@ -9,6 +9,7 @@ from app.repositories.attendance import AttendanceRepository
 from app.repositories.leave_requests import LeaveRequestsRepository
 from app.repositories.organizations import OrganizationsRepository
 from app.repositories.reports import ReportsRepository
+from app.repositories.users import UsersRepository
 from app.schemas.analytics import CalendarDay, DayStatusCounts, Report, TeamAnalytics
 from app.schemas.attendance import TeamAttendanceRecord
 from app.schemas.auth import InviteRequest, UserProfile
@@ -110,6 +111,14 @@ def team_member_calendar(
     return build_personal_calendar(
         records, [leave for leave in approved_leave if leave["user_id"] == user_id], start, end
     )
+
+
+@router.get("/users", response_model=list[UserProfile])
+def list_team_members(
+    user_client: Client = Depends(get_user_client),
+    admin: dict = Depends(require_admin),
+):
+    return UsersRepository(user_client).list_for_org()
 
 
 @router.get("/settings", response_model=OrgSettings)

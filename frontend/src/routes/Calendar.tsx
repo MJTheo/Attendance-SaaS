@@ -149,6 +149,8 @@ function TeamMonthGrid({ year, month, days }: { year: number; month: number; day
 export function Calendar() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [view, setView] = useState<'mine' | 'team'>('mine')
+  const [members, setMembers] = useState<UserProfile[]>([])
+  const [selectedMemberId, setSelectedMemberId] = useState<string>('')
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
@@ -161,12 +163,22 @@ export function Calendar() {
     api.me().then(setProfile).catch(() => setProfile(null))
   }, [])
 
+  useEffect(() => {
+    if (profile?.role === 'admin') {
+      api.teamMembers().then(setMembers).catch(() => setMembers([]))
+    }
+  }, [profile])
+
+  const drilldown = view === 'team' && profile?.role === 'admin' && selectedMemberId !== ''
+
   const load = useCallback(async () => {
     if (!profile) return
     setLoading(true)
     setError(null)
     try {
-      if (view === 'team' && profile.role === 'admin') {
+      if (view === 'team' && profile.role === 'admin' && selectedMemberId) {
+        setPersonalDays(await api.teamMemberCalendar(selectedMemberId, year, month))
+      } else if (view === 'team' && profile.role === 'admin') {
         setTeamDays(await api.teamCalendar(year, month))
       } else {
         setPersonalDays(await api.myCalendar(year, month))
@@ -176,7 +188,7 @@ export function Calendar() {
     } finally {
       setLoading(false)
     }
-  }, [profile, view, year, month])
+  }, [profile, view, selectedMemberId, year, month])
 
   useEffect(() => {
     load()
@@ -191,6 +203,11 @@ export function Calendar() {
     setMonth(newMonth)
   }
 
+  function handleViewChange(newView: 'mine' | 'team') {
+    setView(newView)
+    if (newView === 'mine') setSelectedMemberId('')
+  }
+
   return (
     <div className="min-h-screen">
       <Header profile={profile} />
@@ -202,18 +219,32 @@ export function Calendar() {
             {profile.role === 'admin' && (
               <div className="flex overflow-hidden rounded-md border border-border font-mono text-xs">
                 <button
-                  onClick={() => setView('mine')}
+                  onClick={() => handleViewChange('mine')}
                   className={`px-3 py-1.5 ${view === 'mine' ? 'bg-status-good text-bg' : 'text-text-muted hover:text-text'}`}
                 >
                   My calendar
                 </button>
                 <button
-                  onClick={() => setView('team')}
+                  onClick={() => handleViewChange('team')}
                   className={`px-3 py-1.5 ${view === 'team' ? 'bg-status-good text-bg' : 'text-text-muted hover:text-text'}`}
                 >
                   Team
                 </button>
               </div>
+            )}
+            {view === 'team' && profile.role === 'admin' && (
+              <select
+                value={selectedMemberId}
+                onChange={(e) => setSelectedMemberId(e.target.value)}
+                className="rounded-md border border-border bg-bg px-2 py-1.5 font-mono text-xs text-text outline-none focus:border-status-good"
+              >
+                <option value="">All (aggregate)</option>
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
             )}
           </div>
           <MonthNav year={year} month={month} onChange={handleMonthChange} />
@@ -221,9 +252,15 @@ export function Calendar() {
 
         {error && <p className="mb-4 font-mono text-sm text-status-warning">{error}</p>}
 
+        {drilldown && (
+          <p className="mb-3 font-mono text-xs text-text-muted">
+            Showing {members.find((m) => m.id === selectedMemberId)?.name ?? 'staff member'}'s calendar
+          </p>
+        )}
+
         {loading ? (
           <p className="font-mono text-sm text-text-muted">Loading…</p>
-        ) : view === 'team' && profile.role === 'admin' ? (
+        ) : view === 'team' && profile.role === 'admin' && !drilldown ? (
           <TeamMonthGrid year={year} month={month} days={teamDays} />
         ) : (
           <PersonalMonthGrid year={year} month={month} days={personalDays} />

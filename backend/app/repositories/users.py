@@ -19,3 +19,9 @@ class UsersRepository:
             .execute()
         )
         return response.data[0]
+
+    def list_for_org(self) -> list[dict]:
+        # RLS ("members can view users in their org") scopes this to the
+        # caller's org automatically — no explicit org_id filter needed.
+        response = self._client.table("users").select("*").order("name").execute()
+        return response.data
