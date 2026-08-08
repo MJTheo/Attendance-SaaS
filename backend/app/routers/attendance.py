@@ -4,6 +4,7 @@ from supabase import Client
 from app.core.security import CurrentUser, decode_current_user
 from app.dependencies import get_user_client, require_profile
 from app.repositories.attendance import AttendanceRepository
+from app.repositories.organizations import OrganizationsRepository
 from app.schemas.analytics import StreakResponse
 from app.schemas.attendance import AttendanceRecord, ClockOutRequest
 from app.services.analytics_service import compute_streak
@@ -55,6 +56,8 @@ def my_history(
 def my_streak(
     current_user: CurrentUser = Depends(decode_current_user),
     user_client: Client = Depends(get_user_client),
+    profile: dict = Depends(require_profile),
 ):
+    org = OrganizationsRepository(user_client).get(profile["org_id"])
     records = AttendanceRepository(user_client).list_for_user(current_user.id, 400)
-    return {"current_streak": compute_streak(records)}
+    return {"current_streak": compute_streak(records, org["working_days"])}

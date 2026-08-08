@@ -1,16 +1,23 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
-import { api, type Correction, type TeamAttendanceRecord, type UserProfile } from '../lib/api'
+import { api, type Correction, type OrgSettings, type TeamAttendanceRecord, type UserProfile } from '../lib/api'
 import { DEMO_ADMIN_EMAIL } from '../lib/demo'
 import { Header } from '../components/Header'
 import { StatusDot, statusToVariant } from '../components/StatusDot'
 import { CorrectionsList } from '../components/CorrectionsList'
 import { formatTimestamp } from '../lib/datetime'
 
+const WORKING_DAYS_LABEL: Record<number, string> = {
+  5: '5 days/week (Mon–Fri)',
+  6: '6 days/week (Mon–Sat)',
+  7: '7 days/week (Mon–Sun)',
+}
+
 export function Team() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [records, setRecords] = useState<TeamAttendanceRecord[]>([])
   const [corrections, setCorrections] = useState<Correction[]>([])
+  const [orgSettings, setOrgSettings] = useState<OrgSettings | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [inviteEmail, setInviteEmail] = useState('')
@@ -18,6 +25,7 @@ export function Team() {
   const [inviteError, setInviteError] = useState<string | null>(null)
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null)
   const [inviting, setInviting] = useState(false)
+  const [savingSettings, setSavingSettings] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -25,9 +33,14 @@ export function Team() {
       const me = await api.me()
       setProfile(me)
       if (me.role !== 'admin') return
-      const [attendance, allCorrections] = await Promise.all([api.teamAttendance(), api.corrections()])
+      const [attendance, allCorrections, settings] = await Promise.all([
+        api.teamAttendance(),
+        api.corrections(),
+        api.orgSettings(),
+      ])
       setRecords(attendance)
       setCorrections(allCorrections)
+      setOrgSettings(settings)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load')
     } finally {
@@ -56,6 +69,20 @@ export function Team() {
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to reject')
+    }
+  }
+
+  async function handleWorkingDaysChange(event: ChangeEvent<HTMLSelectElement>) {
+    const workingDays = Number(event.target.value) as 5 | 6 | 7
+    setError(null)
+    setSavingSettings(true)
+    try {
+      const updated = await api.updateOrgSettings(workingDays)
+      setOrgSettings(updated)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update settings')
+    } finally {
+      setSavingSettings(false)
     }
   }
 
@@ -99,6 +126,38 @@ export function Team() {
 
       <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
         {error && <p className="mb-4 font-mono text-sm text-status-warning">{error}</p>}
+
+        {orgSettings && (
+          <section className="mb-8 rounded-lg border border-border bg-surface p-4 sm:p-6">
+            <h2 className="mb-3 font-sans text-sm font-semibold uppercase tracking-wide text-text-muted">
+              Organization settings
+            </h2>
+            <label className="block">
+              <span className="mb-1 block font-mono text-xs uppercase tracking-wide text-text-muted">
+                Working days
+              </span>
+              {profile.email !== DEMO_ADMIN_EMAIL ? (
+                <select
+                  value={orgSettings.working_days}
+                  onChange={handleWorkingDaysChange}
+                  disabled={savingSettings}
+                  className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-status-good disabled:opacity-50 sm:w-auto"
+                >
+                  {[5, 6, 7].map((n) => (
+                    <option key={n} value={n}>
+                      {WORKING_DAYS_LABEL[n]}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p className="font-mono text-sm text-text">{WORKING_DAYS_LABEL[orgSettings.working_days]}</p>
+              )}
+            </label>
+            <p className="mt-2 font-mono text-xs text-text-muted">
+              Controls which weekdays show up in analytics and which days count toward streaks.
+            </p>
+          </section>
+        )}
 
         {profile.email !== DEMO_ADMIN_EMAIL && (
           <section className="mb-8 rounded-lg border border-border bg-surface p-4 sm:p-6">

@@ -104,6 +104,10 @@ export interface Report {
   }
 }
 
+export interface OrgSettings {
+  working_days: 5 | 6 | 7
+}
+
 export interface Correction {
   id: string
   attendance_record_id: string
@@ -151,4 +155,10 @@ export const api = {
   streak: () => apiFetch<StreakResponse>('/attendance/streak'),
   analytics: () => apiFetch<TeamAnalytics>('/admin/analytics'),
   reports: () => apiFetch<Report[]>('/admin/reports'),
+  orgSettings: () => apiFetch<OrgSettings>('/admin/settings'),
+  updateOrgSettings: (workingDays: 5 | 6 | 7) =>
+    apiFetch<OrgSettings>('/admin/settings', {
+      method: 'PATCH',
+      body: JSON.stringify({ working_days: workingDays }),
+    }),
 }
