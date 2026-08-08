@@ -35,7 +35,7 @@ async def lifespan(app: FastAPI):
     scheduler.shutdown()
 
 
-app = FastAPI(title="Landas Time API", version="1.0.0-alpha", lifespan=lifespan)
+app = FastAPI(title="Landas Time API", version="0.1.1-alpha", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

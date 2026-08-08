@@ -2,7 +2,7 @@
 
 ## Where things stand
 
-**v1.0.0-alpha — Build Phase 1**, shipped 2026-08-08. Live at https://attendance-saa-s.vercel.app.
+**v0.1.1-alpha — Build Phase 1**, shipped 2026-08-08. Live at https://attendance-saa-s.vercel.app.
 
 Everything from the original 4-phase plan (foundation, corrections + admin dashboard, analytics,
 polish) plus a full extra round of work done after that: sick/annual leave requests with their own
