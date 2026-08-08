@@ -3,6 +3,9 @@ import { Navigate } from 'react-router-dom'
 import { api, type Report, type TeamAnalytics, type UserProfile } from '../lib/api'
 import { Header } from '../components/Header'
 import { formatTimestamp } from '../lib/datetime'
+import { TrendChart } from '../components/charts/TrendChart'
+import { DonutChart } from '../components/charts/DonutChart'
+import { WeekdayBarChart } from '../components/charts/WeekdayBarChart'
 
 function formatPct(rate: number): string {
   return `${Math.round(rate * 100)}%`
@@ -54,6 +57,33 @@ export function Analytics() {
       <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
         {error && <p className="mb-4 font-mono text-sm text-status-warning">{error}</p>}
 
+        <div className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <section className="rounded-lg border border-border bg-surface p-4 sm:p-6">
+            <h2 className="mb-3 font-sans text-sm font-semibold uppercase tracking-wide text-text-muted">
+              Attendance trend (last 30 days)
+            </h2>
+            {analytics && <TrendChart data={analytics.trend} />}
+          </section>
+
+          <section className="rounded-lg border border-border bg-surface p-4 sm:p-6">
+            <h2 className="mb-3 font-sans text-sm font-semibold uppercase tracking-wide text-text-muted">
+              Status distribution (last 30 days)
+            </h2>
+            {analytics && (
+              <DonutChart
+                segments={[
+                  { label: 'Present', value: analytics.distribution.present, color: 'var(--color-status-good)' },
+                  { label: 'Late', value: analytics.distribution.late, color: 'var(--color-status-warning)' },
+                  { label: 'Early leave', value: analytics.distribution.early_leave, color: 'var(--color-status-warning)' },
+                  { label: 'Absent', value: analytics.distribution.absent, color: 'var(--color-status-neutral)' },
+                  { label: 'Sick leave', value: analytics.distribution.sick_leave, color: 'var(--color-status-info)' },
+                  { label: 'Annual leave', value: analytics.distribution.annual_leave, color: 'var(--color-status-leave)' },
+                ]}
+              />
+            )}
+          </section>
+        </div>
+
         <section className="mb-8">
           <h2 className="mb-3 font-sans text-sm font-semibold uppercase tracking-wide text-text-muted">
             Team summary
@@ -97,6 +127,11 @@ export function Analytics() {
           <h2 className="mb-3 font-sans text-sm font-semibold uppercase tracking-wide text-text-muted">
             Late rate by weekday
           </h2>
+          {analytics && (
+            <div className="mb-4 rounded-lg border border-border bg-surface p-4 sm:p-6">
+              <WeekdayBarChart data={analytics.by_weekday} />
+            </div>
+          )}
           <div className="overflow-x-auto rounded-lg border border-border">
             <table className="w-full border-collapse whitespace-nowrap font-mono text-sm">
               <thead>

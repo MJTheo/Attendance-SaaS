@@ -86,9 +86,47 @@ export interface WeekdayLateRate {
   late_rate: number
 }
 
+export type LeaveStatusKey = 'sick_leave' | 'annual_leave'
+export type CalendarStatus = AttendanceRecord['status'] | LeaveStatusKey
+
+export interface StatusDistribution {
+  present: number
+  late: number
+  early_leave: number
+  absent: number
+  sick_leave: number
+  annual_leave: number
+}
+
+export interface DayStatusCounts extends StatusDistribution {
+  date: string
+}
+
+export interface CalendarDay {
+  date: string
+  status: CalendarStatus | null
+}
+
 export interface TeamAnalytics {
   users: UserAnalyticsSummary[]
   by_weekday: WeekdayLateRate[]
+  distribution: StatusDistribution
+  trend: DayStatusCounts[]
+}
+
+export interface LeaveRequest {
+  id: string
+  org_id: string
+  user_id: string
+  leave_type: 'sick' | 'annual'
+  start_date: string
+  end_date: string
+  reason: string
+  status: 'pending' | 'approved' | 'rejected'
+  requested_by: string
+  approved_by: string | null
+  created_at: string
+  resolved_at: string | null
 }
 
 export interface Report {
@@ -146,7 +184,10 @@ export const api = {
   corrections: () => apiFetch<Correction[]>('/corrections'),
   approveCorrection: (id: string) => apiFetch<Correction>(`/corrections/${id}/approve`, { method: 'PATCH' }),
   rejectCorrection: (id: string) => apiFetch<Correction>(`/corrections/${id}/reject`, { method: 'PATCH' }),
-  teamAttendance: () => apiFetch<TeamAttendanceRecord[]>('/admin/attendance'),
+  teamAttendance: (period?: { start: string; end: string }) =>
+    apiFetch<TeamAttendanceRecord[]>(
+      period ? `/admin/attendance?start=${period.start}&end=${period.end}` : '/admin/attendance'
+    ),
   inviteStaff: (email: string, name: string) =>
     apiFetch<UserProfile>('/admin/invite', {
       method: 'POST',
@@ -161,4 +202,18 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ working_days: workingDays }),
     }),
+  requestLeave: (leaveType: 'sick' | 'annual', startDate: string, endDate: string, reason: string) =>
+    apiFetch<LeaveRequest>('/leave', {
+      method: 'POST',
+      body: JSON.stringify({ leave_type: leaveType, start_date: startDate, end_date: endDate, reason }),
+    }),
+  leaveRequests: () => apiFetch<LeaveRequest[]>('/leave'),
+  approveLeave: (id: string) => apiFetch<LeaveRequest>(`/leave/${id}/approve`, { method: 'PATCH' }),
+  rejectLeave: (id: string) => apiFetch<LeaveRequest>(`/leave/${id}/reject`, { method: 'PATCH' }),
+  myCalendar: (year: number, month: number) =>
+    apiFetch<CalendarDay[]>(`/attendance/calendar?year=${year}&month=${month}`),
+  teamCalendar: (year: number, month: number) =>
+    apiFetch<DayStatusCounts[]>(`/admin/calendar?year=${year}&month=${month}`),
+  teamMemberCalendar: (userId: string, year: number, month: number) =>
+    apiFetch<CalendarDay[]>(`/admin/calendar/${userId}?year=${year}&month=${month}`),
 }

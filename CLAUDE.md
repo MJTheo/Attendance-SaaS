@@ -1,4 +1,4 @@
-# Attendance SaaS — project context
+# Landas Time — project context
 
 Multi-tenant workforce attendance SaaS. Organizations sign up, onboard their team, and manage clock-ins, correction requests, and attendance analytics.
 
@@ -24,13 +24,14 @@ These are non-negotiable — flag it rather than working around them:
 
 ## Data model
 
-- `organizations` — id, name, plan, created_at
+- `organizations` — id, name, plan, created_at, working_days (5/6/7, Monday-first)
 - `users` — id, org_id (FK), role (admin/staff), name, email
 - `attendance_records` — id, org_id, user_id, clock_in, clock_out, status, notes
 - `corrections` — id, attendance_record_id, requested_by, approved_by, reason, old_value, new_value, status, created_at
+- `leave_requests` — id, org_id, user_id, leave_type (sick/annual), start_date, end_date, reason, status, requested_by, approved_by, created_at, resolved_at
 - `reports` — id, org_id, type, generated_at, payload
 
-Status values: `present`, `late`, `early_leave`, `absent`.
+Attendance status values: `present`, `late`, `early_leave`, `absent`. Leave is a separate concept (its own table, its own approval workflow) rather than more `attendance_records.status` values — a leave day isn't a clock-in event to correct, it's the deliberate absence of one. Calendar/analytics views surface it alongside attendance status as `sick_leave`/`annual_leave`.
 
 ## Roles
 
@@ -50,7 +51,7 @@ Work through these in order. Do not start a phase before the previous one is dep
 
 Dark "systems dashboard" aesthetic, consistent with the owner's existing portfolio:
 
-- Status communicated via colored dots — teal (good/present), amber (warning/late), slate (neutral/inactive)
+- Status communicated via colored dots — teal (good/present), amber (warning/late), slate (neutral/inactive), sky (sick leave), violet (annual leave). The palette grew from 3 to 5 colors when leave types were added; a calendar with 6 status types needs that to stay readable, but keep new colors this deliberate and documented rather than adding one per feature.
 - JetBrains Mono for data, timestamps, and numeric fields
 - Space Grotesk for headings
 - Dense, information-first layouts — this is an ops tool, not a marketing site

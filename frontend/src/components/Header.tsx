@@ -17,6 +17,9 @@ export function Header({ profile }: { profile: UserProfile }) {
           <Link to="/" className="text-text-muted hover:text-text">
             Dashboard
           </Link>
+          <Link to="/calendar" className="text-text-muted hover:text-text">
+            Calendar
+          </Link>
           {profile.role === 'admin' && (
             <>
               <Link to="/team" className="text-text-muted hover:text-text">

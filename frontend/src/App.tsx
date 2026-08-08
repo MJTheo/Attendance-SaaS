@@ -4,6 +4,7 @@ import { SignUp } from './routes/SignUp'
 import { Dashboard } from './routes/Dashboard'
 import { Team } from './routes/Team'
 import { Analytics } from './routes/Analytics'
+import { Calendar } from './routes/Calendar'
 import { AcceptInvite } from './routes/AcceptInvite'
 import { ProtectedRoute } from './routes/ProtectedRoute'
 
@@ -17,6 +18,7 @@ function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/team" element={<Team />} />
           <Route path="/analytics" element={<Analytics />} />
+          <Route path="/calendar" element={<Calendar />} />
           <Route path="/accept-invite" element={<AcceptInvite />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

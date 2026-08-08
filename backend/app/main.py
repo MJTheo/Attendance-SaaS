@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
 from app.dependencies import get_service_role_client
 from app.jobs.reports import generate_weekly_reports
-from app.routers import admin, attendance, auth, corrections
+from app.routers import admin, attendance, auth, corrections, leave
 
 settings = get_settings()
 
@@ -28,7 +28,7 @@ async def lifespan(app: FastAPI):
     scheduler.shutdown()
 
 
-app = FastAPI(title="Attendance SaaS API", version="0.1.0-alpha", lifespan=lifespan)
+app = FastAPI(title="Landas Time API", version="0.1.0-alpha", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -41,6 +41,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(attendance.router)
 app.include_router(corrections.router)
+app.include_router(leave.router)
 app.include_router(admin.router)
 
 

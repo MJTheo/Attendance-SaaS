@@ -81,8 +81,40 @@ class AttendanceRepository:
             .limit(limit)
             .execute()
         )
+        return self._flatten_user_name(response.data)
+
+    def list_for_org_range(self, start: str, end: str, limit: int = 5000) -> list[dict]:
+        """clock_in in [start, end) — end is exclusive, pass a day boundary.
+        Used by the calendar, the analytics trend chart, and the Team page's
+        period-grouped attendance view, so it stays bounded instead of
+        pulling the whole org's history like list_for_org does."""
+        response = (
+            self._client.table("attendance_records")
+            .select("*, users(name)")
+            .gte("clock_in", start)
+            .lt("clock_in", end)
+            .order("clock_in", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return self._flatten_user_name(response.data)
+
+    def list_for_user_range(self, user_id: str, start: str, end: str) -> list[dict]:
+        response = (
+            self._client.table("attendance_records")
+            .select("*")
+            .eq("user_id", user_id)
+            .gte("clock_in", start)
+            .lt("clock_in", end)
+            .order("clock_in", desc=True)
+            .execute()
+        )
+        return response.data
+
+    @staticmethod
+    def _flatten_user_name(rows: list[dict]) -> list[dict]:
         records = []
-        for row in response.data:
+        for row in rows:
             user = row.pop("users", None) or {}
             records.append({**row, "user_name": user.get("name", "")})
         return records

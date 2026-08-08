@@ -1,9 +1,19 @@
 import { Fragment, useCallback, useEffect, useState } from 'react'
-import { api, ApiError, type AttendanceRecord, type Correction, type CorrectionFields, type UserProfile } from '../lib/api'
+import {
+  api,
+  ApiError,
+  type AttendanceRecord,
+  type Correction,
+  type CorrectionFields,
+  type LeaveRequest,
+  type UserProfile,
+} from '../lib/api'
 import { StatusDot, statusToVariant } from '../components/StatusDot'
 import { Header } from '../components/Header'
 import { CorrectionRequestForm } from '../components/CorrectionRequestForm'
 import { CorrectionsList } from '../components/CorrectionsList'
+import { LeaveRequestForm } from '../components/LeaveRequestForm'
+import { LeaveRequestsList } from '../components/LeaveRequestsList'
 import { formatTimestamp } from '../lib/datetime'
 import { Onboarding } from './Onboarding'
 
@@ -12,12 +22,14 @@ export function Dashboard() {
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
   const [history, setHistory] = useState<AttendanceRecord[]>([])
   const [corrections, setCorrections] = useState<Correction[]>([])
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([])
   const [streak, setStreak] = useState(0)
   const [loading, setLoading] = useState(true)
   const [actionError, setActionError] = useState<string | null>(null)
   const [actionPending, setActionPending] = useState(false)
   const [notes, setNotes] = useState('')
   const [correctingRecordId, setCorrectingRecordId] = useState<string | null>(null)
+  const [requestingLeave, setRequestingLeave] = useState(false)
 
   const loadHistory = useCallback(async () => {
     const [historyData, streakData] = await Promise.all([api.history(), api.streak()])
@@ -29,13 +41,17 @@ export function Dashboard() {
     setCorrections(await api.corrections())
   }, [])
 
+  const loadLeaveRequests = useCallback(async () => {
+    setLeaveRequests(await api.leaveRequests())
+  }, [])
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const me = await api.me()
       setProfile(me)
       setNeedsOnboarding(false)
-      await Promise.all([loadHistory(), loadCorrections()])
+      await Promise.all([loadHistory(), loadCorrections(), loadLeaveRequests()])
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) {
         setNeedsOnboarding(true)
@@ -45,7 +61,7 @@ export function Dashboard() {
     } finally {
       setLoading(false)
     }
-  }, [loadHistory, loadCorrections])
+  }, [loadHistory, loadCorrections, loadLeaveRequests])
 
   useEffect(() => {
     load()
@@ -106,6 +122,12 @@ export function Dashboard() {
     await api.requestCorrection(recordId, reason, newValue)
     setCorrectingRecordId(null)
     await loadCorrections()
+  }
+
+  async function handleRequestLeave(leaveType: 'sick' | 'annual', startDate: string, endDate: string, reason: string) {
+    await api.requestLeave(leaveType, startDate, endDate, reason)
+    setRequestingLeave(false)
+    await loadLeaveRequests()
   }
 
   return (
@@ -218,11 +240,33 @@ export function Dashboard() {
           </div>
         </section>
 
-        <section>
+        <section className="mb-8">
           <h2 className="mb-3 font-sans text-sm font-semibold uppercase tracking-wide text-text-muted">
             My correction requests
           </h2>
           <CorrectionsList corrections={myCorrections} />
+        </section>
+
+        <section>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-sans text-sm font-semibold uppercase tracking-wide text-text-muted">
+              My leave requests
+            </h2>
+            {!requestingLeave && (
+              <button
+                onClick={() => setRequestingLeave(true)}
+                className="font-mono text-xs text-text-muted hover:text-text"
+              >
+                + Request leave
+              </button>
+            )}
+          </div>
+          {requestingLeave && (
+            <div className="mb-3">
+              <LeaveRequestForm onCancel={() => setRequestingLeave(false)} onSubmit={handleRequestLeave} />
+            </div>
+          )}
+          <LeaveRequestsList requests={leaveRequests} />
         </section>
       </main>
     </div>

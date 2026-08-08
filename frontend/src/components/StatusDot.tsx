@@ -1,13 +1,15 @@
-import type { AttendanceRecord } from '../lib/api'
+import type { AttendanceRecord, CalendarStatus } from '../lib/api'
 
-// Only three status colors exist in this product's design language:
-// teal = good/present, amber = warning/late, slate = neutral/inactive.
-export type DotVariant = 'good' | 'warning' | 'neutral'
+// teal = good/present, amber = warning/late, slate = neutral/inactive,
+// sky = sick leave, violet = annual leave.
+export type DotVariant = 'good' | 'warning' | 'neutral' | 'info' | 'leave'
 
 const dotClasses: Record<DotVariant, string> = {
   good: 'bg-status-good',
   warning: 'bg-status-warning',
   neutral: 'bg-status-neutral',
+  info: 'bg-status-info',
+  leave: 'bg-status-leave',
 }
 
 export function statusToVariant(status: AttendanceRecord['status']): DotVariant {
@@ -20,6 +22,12 @@ export function statusToVariant(status: AttendanceRecord['status']): DotVariant 
     case 'absent':
       return 'neutral'
   }
+}
+
+export function calendarStatusToVariant(status: CalendarStatus): DotVariant {
+  if (status === 'sick_leave') return 'info'
+  if (status === 'annual_leave') return 'leave'
+  return statusToVariant(status)
 }
 
 export function StatusDot({ variant, label }: { variant: DotVariant; label?: string }) {

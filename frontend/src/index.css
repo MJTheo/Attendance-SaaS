@@ -20,14 +20,21 @@
   --color-text: #e8eaf0;
   --color-text-muted: #969ba8;
 
-  /* The only three status colors this product uses, per the design language
-     spec: teal = good/present, amber = warning/late, slate = neutral/inactive. */
+  /* Core status colors, per the design language spec: teal = good/present,
+     amber = warning/late, slate = neutral/inactive. Two more (info, leave)
+     were added alongside sick/annual leave — a calendar showing 6 status
+     types needs more than 3 colors to stay readable, so this extends the
+     original 3-color rule rather than overloading it. */
   --color-status-good: #2dd4bf;
   --color-status-good-bg: rgb(45 212 191 / 0.12);
   --color-status-warning: #f59e0b;
   --color-status-warning-bg: rgb(245 158 11 / 0.12);
   --color-status-neutral: #64748b;
   --color-status-neutral-bg: rgb(100 116 139 / 0.12);
+  --color-status-info: #38bdf8;
+  --color-status-info-bg: rgb(56 189 248 / 0.12);
+  --color-status-leave: #a78bfa;
+  --color-status-leave-bg: rgb(167 139 250 / 0.12);
 }
 
 /* Light theme override: same tokens, different values. Applied via a
@@ -48,6 +55,10 @@
   --color-status-warning-bg: rgb(217 119 6 / 0.1);
   --color-status-neutral: #475569;
   --color-status-neutral-bg: rgb(71 85 105 / 0.1);
+  --color-status-info: #0284c7;
+  --color-status-info-bg: rgb(2 132 199 / 0.1);
+  --color-status-leave: #7c3aed;
+  --color-status-leave-bg: rgb(124 58 237 / 0.1);
 }
 
 :root {

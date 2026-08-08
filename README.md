@@ -1,4 +1,4 @@
-# Attendance SaaS
+# Landas Time
 
 **Status: v0.1.0-alpha** — all four planned build phases (foundation, corrections, analytics, polish) are deployed and live at the demo link below. Pre-1.0: expect schema and API shape to still move.
 
@@ -20,8 +20,8 @@ This is a rebuild of a Google Apps Script attendance tool that ran in production
 
 The non-negotiable rules this project was built around:
 
-1. **Tenant isolation is enforced at the database layer**, not just in application code. Every tenant-scoped table (`users`, `attendance_records`, `corrections`, `reports`) has Postgres row-level security keyed off `org_id`, using `SECURITY DEFINER` helper functions (`app.current_org_id()`, `app.is_admin()`) in a schema PostgREST doesn't expose. A missing `WHERE org_id = ...` in application code can't leak another org's data — RLS still blocks it.
-2. **No silent edits to attendance records.** Any change to `attendance_records` that isn't a direct clock-in/out goes through the `corrections` table, with the old value snapshotted server-side (never trusted from the client) and a full audit trail of who requested, who approved, and why. A Postgres trigger enforces this at the database level — staff can't update a closed clock-in record even if they bypass the API.
+1. **Tenant isolation is enforced at the database layer**, not just in application code. Every tenant-scoped table (`users`, `attendance_records`, `corrections`, `leave_requests`, `reports`) has Postgres row-level security keyed off `org_id`, using `SECURITY DEFINER` helper functions (`app.current_org_id()`, `app.is_admin()`) in a schema PostgREST doesn't expose. A missing `WHERE org_id = ...` in application code can't leak another org's data — RLS still blocks it.
+2. **No silent edits to attendance records.** Any change to `attendance_records` that isn't a direct clock-in/out goes through the `corrections` table, with the old value snapshotted server-side (never trusted from the client) and a full audit trail of who requested, who approved, and why. A Postgres trigger enforces this at the database level — staff can't update a closed clock-in record even if they bypass the API. Sick/annual leave follows the same audit-trail shape via a separate `leave_requests` table, since a leave day isn't a clock-in event to correct — it's the deliberate absence of one.
 3. **Business logic lives in the API layer**, not the frontend and not the database (beyond integrity constraints). Status calculation, streak calculation, and pattern analytics are all computed server-side in Python; the frontend only renders what the API returns.
 4. **Data access goes through a repository/service layer.** Routers depend on services, services depend on repositories, repositories are the only code that touches the Supabase client directly — the database could be swapped without rewriting business logic.
 5. **Two Supabase client patterns, chosen deliberately per call site:** a per-request client that forwards the caller's own JWT (so RLS evaluates as that user, not as an app-wide superuser) is the default for everything. A service-role client that bypasses RLS entirely is reserved for the handful of operations that structurally require it — org bootstrap, applying an approved correction, the scheduled report job, and creating a new Supabase Auth identity when inviting staff — and each one is commented explaining why.
@@ -29,18 +29,21 @@ The non-negotiable rules this project was built around:
 
 ### Data model
 
-- `organizations` — id, name, plan, created_at
+- `organizations` — id, name, plan, created_at, working_days (5/6/7, Monday-first — which weekdays this org operates)
 - `users` — id (= `auth.users.id`), org_id, role (`admin` / `staff`), name, email
 - `attendance_records` — id, org_id, user_id, clock_in, clock_out, status, notes
 - `corrections` — id, attendance_record_id, org_id, requested_by, approved_by, reason, old_value, new_value, status, created_at, resolved_at
+- `leave_requests` — id, org_id, user_id, leave_type (`sick` / `annual`), start_date, end_date, reason, status, requested_by, approved_by, created_at, resolved_at
 - `reports` — id, org_id, type, generated_at, payload (jsonb)
 
 ### Notable trade-offs
 
-- **No shift-schedule config exists yet**, so there's nothing to compare a clock-in time against. Every clock-in defaults to `present`; `late`/`early_leave`/`absent` only ever appear via an admin-approved correction. Streak and pattern analytics are computed only from records that actually exist — a day with no record isn't assumed to be a missed workday, since there's no concept of which days someone was scheduled to work.
+- **No shift-schedule config exists yet**, so there's nothing to compare a clock-in time against. Every clock-in defaults to `present`; `late`/`early_leave`/`absent` only ever appear via an admin-approved correction. Streak and pattern analytics are computed only from records that actually exist — a day with no record isn't assumed to be a missed workday, using each org's `working_days` (not a hardcoded Mon–Fri assumption) to tell a non-working day apart from an actual gap.
 - **Supabase's free-tier mailer has a low email rate limit** (a couple of sends/hour). The invite endpoint distinguishes that from "email already registered" and returns a proper 429, but real production use would want a custom SMTP provider configured in Supabase to lift it.
 - **The demo account is a shared, mutable login**, not a read-only sandbox — simplest way to let a visitor explore the real app (real RLS, real API, real writes) without a signup step.
 - **Creating a new org requires a TOTP access code** (`/auth/signup`'s "Access code" field), same rotating-code mechanism as an authenticator app — keeps a public deployment from letting random visitors spin up real orgs, without a static secret sitting in the signup form.
+- **The status palette grew from 3 colors to 5** when sick/annual leave were added. The original design language reserved teal/amber/slate for good/warning/neutral; a calendar showing 6 status types with only 3 colors would've been unreadable, so two more (sky for sick leave, violet for annual leave) were added as a deliberate, documented extension rather than overloading an existing color with a second meaning.
+- **Analytics trend/distribution cover a trailing 30-day window**, not all-time, so the payload stays bounded regardless of how long an org has been running.
 
 ## Local development
 
