@@ -1,8 +1,12 @@
-import { Link } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { UserProfile } from '../lib/api'
 import { Brand } from './Brand'
 import { ThemeToggle } from './ThemeToggle'
+
+function navLinkClass({ isActive }: { isActive: boolean }): string {
+  return isActive ? 'font-semibold text-status-good' : 'text-text-muted hover:text-text'
+}
 
 export function Header({ profile }: { profile: UserProfile }) {
   return (
@@ -13,21 +17,27 @@ export function Header({ profile }: { profile: UserProfile }) {
           <p className="font-sans text-base font-semibold text-text sm:text-lg">{profile.name}</p>
           <p className="font-mono text-xs uppercase tracking-wide text-text-muted">{profile.role}</p>
         </div>
-        <nav className="flex gap-4 font-mono text-sm">
-          <Link to="/" className="text-text-muted hover:text-text">
+        <nav className="flex flex-wrap gap-4 font-mono text-sm">
+          <NavLink to="/" end className={navLinkClass}>
             Dashboard
-          </Link>
-          <Link to="/calendar" className="text-text-muted hover:text-text">
+          </NavLink>
+          <NavLink to="/calendar" className={navLinkClass}>
             Calendar
-          </Link>
+          </NavLink>
+          <NavLink to="/requests" className={navLinkClass}>
+            Requests
+          </NavLink>
           {profile.role === 'admin' && (
             <>
-              <Link to="/team" className="text-text-muted hover:text-text">
+              <NavLink to="/approvals" className={navLinkClass}>
+                Approvals
+              </NavLink>
+              <NavLink to="/team" className={navLinkClass}>
                 Team
-              </Link>
-              <Link to="/analytics" className="text-text-muted hover:text-text">
+              </NavLink>
+              <NavLink to="/analytics" className={navLinkClass}>
                 Analytics
-              </Link>
+              </NavLink>
             </>
           )}
         </nav>

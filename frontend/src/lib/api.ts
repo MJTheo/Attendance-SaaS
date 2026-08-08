@@ -107,6 +107,21 @@ export interface CalendarDay {
   status: CalendarStatus | null
 }
 
+export interface DayDetail {
+  date: string
+  status: CalendarStatus | null
+  clock_in: string | null
+  clock_out: string | null
+  notes: string | null
+  leave_type: 'sick' | 'annual' | null
+  leave_reason: string | null
+}
+
+export interface TeamDayDetail extends DayDetail {
+  user_id: string
+  name: string
+}
+
 export interface TeamAnalytics {
   users: UserAnalyticsSummary[]
   by_weekday: WeekdayLateRate[]
@@ -217,4 +232,6 @@ export const api = {
   teamMemberCalendar: (userId: string, year: number, month: number) =>
     apiFetch<CalendarDay[]>(`/admin/calendar/${userId}?year=${year}&month=${month}`),
   teamMembers: () => apiFetch<UserProfile[]>('/admin/users'),
+  myDay: (isoDate: string) => apiFetch<DayDetail>(`/attendance/day/${isoDate}`),
+  teamDay: (isoDate: string) => apiFetch<TeamDayDetail[]>(`/admin/day/${isoDate}`),
 }

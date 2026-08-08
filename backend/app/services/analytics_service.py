@@ -179,3 +179,54 @@ def build_personal_calendar(records: list[dict], leave_requests: list[dict], sta
                 status_by_day[day] = key
 
     return [{"date": day.isoformat(), "status": status_by_day.get(day)} for day in _date_range(start, end)]
+
+
+def day_detail_for_user(records: list[dict], leave_requests: list[dict], user_id: str, day: date) -> dict:
+    """Full detail (not just a status label) for one user on one day — backs
+    the calendar's click-to-view popup. leave_requests is expected already
+    filtered to this user's approved requests."""
+    for leave in leave_requests:
+        if leave["user_id"] != user_id:
+            continue
+        if _to_date(leave["start_date"]) <= day <= _to_date(leave["end_date"]):
+            return {
+                "date": day.isoformat(),
+                "status": f"{leave['leave_type']}_leave",
+                "clock_in": None,
+                "clock_out": None,
+                "notes": None,
+                "leave_type": leave["leave_type"],
+                "leave_reason": leave["reason"],
+            }
+
+    record = next(
+        (r for r in records if r["user_id"] == user_id and _to_date(r["clock_in"]) == day),
+        None,
+    )
+    if record:
+        return {
+            "date": day.isoformat(),
+            "status": record["status"],
+            "clock_in": record["clock_in"],
+            "clock_out": record.get("clock_out"),
+            "notes": record.get("notes"),
+            "leave_type": None,
+            "leave_reason": None,
+        }
+
+    return {
+        "date": day.isoformat(),
+        "status": None,
+        "clock_in": None,
+        "clock_out": None,
+        "notes": None,
+        "leave_type": None,
+        "leave_reason": None,
+    }
+
+
+def day_detail_for_org(records: list[dict], leave_requests: list[dict], users: list[dict], day: date) -> list[dict]:
+    return [
+        {"user_id": user["id"], "name": user["name"], **day_detail_for_user(records, leave_requests, user["id"], day)}
+        for user in users
+    ]

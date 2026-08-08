@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import Client
@@ -8,9 +8,9 @@ from app.dependencies import get_user_client, require_profile
 from app.repositories.attendance import AttendanceRepository
 from app.repositories.leave_requests import LeaveRequestsRepository
 from app.repositories.organizations import OrganizationsRepository
-from app.schemas.analytics import CalendarDay, StreakResponse
+from app.schemas.analytics import CalendarDay, DayDetail, StreakResponse
 from app.schemas.attendance import AttendanceRecord, ClockOutRequest
-from app.services.analytics_service import build_personal_calendar, compute_streak, month_bounds
+from app.services.analytics_service import build_personal_calendar, compute_streak, day_detail_for_user, month_bounds
 from app.services.attendance_service import (
     AlreadyClockedInError,
     AttendanceService,
@@ -82,4 +82,19 @@ def my_calendar(
     )
     return build_personal_calendar(
         records, [leave for leave in approved_leave if leave["user_id"] == current_user.id], start, end
+    )
+
+
+@router.get("/day/{day}", response_model=DayDetail)
+def my_day(
+    day: date,
+    current_user: CurrentUser = Depends(decode_current_user),
+    user_client: Client = Depends(get_user_client),
+):
+    records = AttendanceRepository(user_client).list_for_user_range(
+        current_user.id, day.isoformat(), (day + timedelta(days=1)).isoformat()
+    )
+    approved_leave = LeaveRequestsRepository(user_client).list_approved_in_range(day.isoformat(), day.isoformat())
+    return day_detail_for_user(
+        records, [leave for leave in approved_leave if leave["user_id"] == current_user.id], current_user.id, day
     )

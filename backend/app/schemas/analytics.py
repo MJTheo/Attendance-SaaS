@@ -49,6 +49,21 @@ class CalendarDay(BaseModel):
     status: str | None
 
 
+class DayDetail(BaseModel):
+    date: str
+    status: str | None
+    clock_in: datetime | None = None
+    clock_out: datetime | None = None
+    notes: str | None = None
+    leave_type: str | None = None
+    leave_reason: str | None = None
+
+
+class TeamDayDetail(DayDetail):
+    user_id: str
+    name: str
+
+
 class TeamAnalytics(BaseModel):
     users: list[UserAnalyticsSummary]
     by_weekday: list[WeekdayLateRate]

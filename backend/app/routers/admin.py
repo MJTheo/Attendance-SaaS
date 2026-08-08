@@ -10,13 +10,14 @@ from app.repositories.leave_requests import LeaveRequestsRepository
 from app.repositories.organizations import OrganizationsRepository
 from app.repositories.reports import ReportsRepository
 from app.repositories.users import UsersRepository
-from app.schemas.analytics import CalendarDay, DayStatusCounts, Report, TeamAnalytics
+from app.schemas.analytics import CalendarDay, DayStatusCounts, Report, TeamAnalytics, TeamDayDetail
 from app.schemas.attendance import TeamAttendanceRecord
 from app.schemas.auth import InviteRequest, UserProfile
 from app.schemas.organization import OrgSettings, UpdateOrgSettings
 from app.services.analytics_service import (
     build_personal_calendar,
     daily_trend,
+    day_detail_for_org,
     late_rate_by_weekday,
     month_bounds,
     status_distribution,
@@ -111,6 +112,18 @@ def team_member_calendar(
     return build_personal_calendar(
         records, [leave for leave in approved_leave if leave["user_id"] == user_id], start, end
     )
+
+
+@router.get("/day/{day}", response_model=list[TeamDayDetail])
+def team_day(
+    day: date,
+    user_client: Client = Depends(get_user_client),
+    admin: dict = Depends(require_admin),
+):
+    records = AttendanceRepository(user_client).list_for_org_range(day.isoformat(), (day + timedelta(days=1)).isoformat())
+    approved_leave = LeaveRequestsRepository(user_client).list_approved_in_range(day.isoformat(), day.isoformat())
+    users = UsersRepository(user_client).list_for_org()
+    return day_detail_for_org(records, approved_leave, users, day)
 
 
 @router.get("/users", response_model=list[UserProfile])

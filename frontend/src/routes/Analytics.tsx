@@ -55,6 +55,8 @@ export function Analytics() {
       <Header profile={profile} />
 
       <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
+        <h1 className="mb-4 font-sans text-lg font-semibold text-text">Analytics</h1>
+
         {error && <p className="mb-4 font-mono text-sm text-status-warning">{error}</p>}
 
         <div className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-2">

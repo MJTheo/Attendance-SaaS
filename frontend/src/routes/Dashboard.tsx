@@ -1,19 +1,9 @@
 import { Fragment, useCallback, useEffect, useState } from 'react'
-import {
-  api,
-  ApiError,
-  type AttendanceRecord,
-  type Correction,
-  type CorrectionFields,
-  type LeaveRequest,
-  type UserProfile,
-} from '../lib/api'
+import { Link } from 'react-router-dom'
+import { api, ApiError, type AttendanceRecord, type CorrectionFields, type UserProfile } from '../lib/api'
 import { StatusDot, statusToVariant } from '../components/StatusDot'
 import { Header } from '../components/Header'
 import { CorrectionRequestForm } from '../components/CorrectionRequestForm'
-import { CorrectionsList } from '../components/CorrectionsList'
-import { LeaveRequestForm } from '../components/LeaveRequestForm'
-import { LeaveRequestsList } from '../components/LeaveRequestsList'
 import { formatTimestamp } from '../lib/datetime'
 import { Onboarding } from './Onboarding'
 
@@ -21,28 +11,17 @@ export function Dashboard() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
   const [history, setHistory] = useState<AttendanceRecord[]>([])
-  const [corrections, setCorrections] = useState<Correction[]>([])
-  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([])
   const [streak, setStreak] = useState(0)
   const [loading, setLoading] = useState(true)
   const [actionError, setActionError] = useState<string | null>(null)
   const [actionPending, setActionPending] = useState(false)
   const [notes, setNotes] = useState('')
   const [correctingRecordId, setCorrectingRecordId] = useState<string | null>(null)
-  const [requestingLeave, setRequestingLeave] = useState(false)
 
   const loadHistory = useCallback(async () => {
     const [historyData, streakData] = await Promise.all([api.history(), api.streak()])
     setHistory(historyData)
     setStreak(streakData.current_streak)
-  }, [])
-
-  const loadCorrections = useCallback(async () => {
-    setCorrections(await api.corrections())
-  }, [])
-
-  const loadLeaveRequests = useCallback(async () => {
-    setLeaveRequests(await api.leaveRequests())
   }, [])
 
   const load = useCallback(async () => {
@@ -51,7 +30,7 @@ export function Dashboard() {
       const me = await api.me()
       setProfile(me)
       setNeedsOnboarding(false)
-      await Promise.all([loadHistory(), loadCorrections(), loadLeaveRequests()])
+      await loadHistory()
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) {
         setNeedsOnboarding(true)
@@ -61,7 +40,7 @@ export function Dashboard() {
     } finally {
       setLoading(false)
     }
-  }, [loadHistory, loadCorrections, loadLeaveRequests])
+  }, [loadHistory])
 
   useEffect(() => {
     load()
@@ -78,7 +57,6 @@ export function Dashboard() {
           setProfile(newProfile)
           setNeedsOnboarding(false)
           loadHistory()
-          loadCorrections()
         }}
       />
     )
@@ -89,7 +67,6 @@ export function Dashboard() {
   }
 
   const openRecord = history.find((record) => record.clock_out === null) ?? null
-  const myCorrections = corrections.filter((c) => c.requested_by === profile.id)
 
   async function handleClockIn() {
     setActionError(null)
@@ -121,13 +98,6 @@ export function Dashboard() {
   async function handleRequestCorrection(recordId: string, reason: string, newValue: CorrectionFields) {
     await api.requestCorrection(recordId, reason, newValue)
     setCorrectingRecordId(null)
-    await loadCorrections()
-  }
-
-  async function handleRequestLeave(leaveType: 'sick' | 'annual', startDate: string, endDate: string, reason: string) {
-    await api.requestLeave(leaveType, startDate, endDate, reason)
-    setRequestingLeave(false)
-    await loadLeaveRequests()
   }
 
   return (
@@ -135,37 +105,43 @@ export function Dashboard() {
       <Header profile={profile} />
 
       <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-8">
-        <section className="mb-8 rounded-lg border border-border bg-surface p-4 sm:p-6">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-y-2">
+        <section className="mb-8 rounded-lg border border-border bg-surface p-6 text-center sm:p-10">
+          <div className="mb-2 flex justify-center">
             <StatusDot
               variant={openRecord ? 'good' : 'neutral'}
               label={openRecord ? 'Clocked in' : 'Not clocked in'}
             />
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-              {openRecord && (
-                <span className="font-mono text-xs text-text-muted">since {formatTimestamp(openRecord.clock_in)}</span>
-              )}
-              <span className="font-mono text-xs text-text-muted">
-                Streak: <span className="text-status-good">{streak}</span> {streak === 1 ? 'day' : 'days'}
-              </span>
-            </div>
           </div>
+          <div className="mb-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+            {openRecord && (
+              <span className="font-mono text-xs text-text-muted">since {formatTimestamp(openRecord.clock_in)}</span>
+            )}
+            <span className="font-mono text-xs text-text-muted">
+              Streak: <span className="text-status-good">{streak}</span> {streak === 1 ? 'day' : 'days'}
+            </span>
+          </div>
+          <p className="mb-6 font-mono text-xs text-text-muted">
+            Need time off or a correction?{' '}
+            <Link to="/requests" className="text-text underline hover:text-status-good">
+              Go to Requests
+            </Link>
+          </p>
 
           {actionError && <p className="mb-4 font-mono text-sm text-status-warning">{actionError}</p>}
 
           {openRecord ? (
-            <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="mx-auto flex max-w-sm flex-col gap-3">
               <input
                 type="text"
                 placeholder="Note (optional)"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="flex-1 rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-status-good"
+                className="rounded-md border border-border bg-bg px-4 py-3 text-sm text-text outline-none focus:border-status-good"
               />
               <button
                 onClick={handleClockOut}
                 disabled={actionPending}
-                className="rounded-md bg-status-warning px-4 py-2 font-medium text-bg transition-opacity hover:opacity-90 disabled:opacity-50"
+                className="rounded-lg bg-status-warning px-6 py-4 text-lg font-semibold text-bg shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50 sm:py-5 sm:text-xl"
               >
                 Clock out
               </button>
@@ -174,7 +150,7 @@ export function Dashboard() {
             <button
               onClick={handleClockIn}
               disabled={actionPending}
-              className="w-full rounded-md bg-status-good px-4 py-2 font-medium text-bg transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="mx-auto block w-full max-w-sm rounded-lg bg-status-good px-6 py-4 text-lg font-semibold text-bg shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50 sm:py-5 sm:text-xl"
             >
               Clock in
             </button>
@@ -238,35 +214,6 @@ export function Dashboard() {
               </tbody>
             </table>
           </div>
-        </section>
-
-        <section className="mb-8">
-          <h2 className="mb-3 font-sans text-sm font-semibold uppercase tracking-wide text-text-muted">
-            My correction requests
-          </h2>
-          <CorrectionsList corrections={myCorrections} />
-        </section>
-
-        <section>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-sans text-sm font-semibold uppercase tracking-wide text-text-muted">
-              My leave requests
-            </h2>
-            {!requestingLeave && (
-              <button
-                onClick={() => setRequestingLeave(true)}
-                className="font-mono text-xs text-text-muted hover:text-text"
-              >
-                + Request leave
-              </button>
-            )}
-          </div>
-          {requestingLeave && (
-            <div className="mb-3">
-              <LeaveRequestForm onCancel={() => setRequestingLeave(false)} onSubmit={handleRequestLeave} />
-            </div>
-          )}
-          <LeaveRequestsList requests={leaveRequests} />
         </section>
       </main>
     </div>
