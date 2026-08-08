@@ -1,7 +1,7 @@
 {
   "name": "landas-time-frontend",
   "private": true,
-  "version": "0.1.0-alpha",
+  "version": "1.0.0-alpha",
   "type": "module",
   "scripts": {
     "dev": "vite",

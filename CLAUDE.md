@@ -31,7 +31,7 @@ These are non-negotiable — flag it rather than working around them:
 - `leave_requests` — id, org_id, user_id, leave_type (sick/annual), start_date, end_date, reason, status, requested_by, approved_by, created_at, resolved_at
 - `reports` — id, org_id, type, generated_at, payload
 
-Attendance status values: `present`, `late`, `early_leave`, `absent`. Leave is a separate concept (its own table, its own approval workflow) rather than more `attendance_records.status` values — a leave day isn't a clock-in event to correct, it's the deliberate absence of one. Calendar/analytics views surface it alongside attendance status as `sick_leave`/`annual_leave`.
+Attendance status values: `present`, `late`, `early_leave`, `absent`, `missed_clockout` (auto-flagged by the daily closeout job when a record is still open once its day has ended). Leave is a separate concept (its own table, its own approval workflow) rather than more `attendance_records.status` values — a leave day isn't a clock-in event to correct, it's the deliberate absence of one. Calendar/analytics views surface it alongside attendance status as `sick_leave`/`annual_leave`.
 
 ## Roles
 
