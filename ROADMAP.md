@@ -68,48 +68,59 @@ which get meaningfully harder to reason about correctly without a real notion of
 
 ---
 
-## Tier 1 — Quick wins (no new data model, low risk, can do anytime)
+## Tier 1 — Quick wins (no new data model, low risk, can do anytime) — done, drafted 2026-08-09
 
-### Collapse top bar for mobile
-*User's #6.* `Header.tsx`'s nav already wraps on narrow screens but doesn't collapse — with Requests/
-Approvals/Team/Analytics added this session it's getting crowded. Standard hamburger-menu treatment.
+All seven shipped together as one round, no DB migration needed (pure code — the four Tier 0
+migrations were the only schema changes in Build Phase 2 so far).
 
-### Status labels shouldn't show underscores
-*User's #14.* `early_leave` → "Early leave", `missed_clockout` → "Missed clock-out", etc. Right now
-several places (`STATUS_OPTIONS` in `CorrectionRequestForm.tsx`, raw `record.status` in table cells)
-render the raw enum value. Write one `formatStatusLabel()` helper and use it everywhere instead of
-the ad-hoc `STATUS_LABEL` map that only exists in `Calendar.tsx` today.
+### ~~Collapse top bar for mobile~~
+*User's #6.* `Header.tsx` now has a hamburger button (`sm:hidden`) that toggles the nav between
+`hidden` and `flex`; the nav itself stays `sm:flex` so desktop is unaffected. Each `NavLink` closes
+the menu on click so navigating doesn't leave it stuck open on mobile.
 
-### Spelling / capitalization pass
-*User's #15.* General copy consistency pass across the UI — labels, button text, error messages.
+### ~~Status labels shouldn't show underscores~~
+*User's #14.* `formatStatusLabel()` in `StatusDot.tsx` replaces the old `Calendar.tsx`-only
+`STATUS_LABEL` map — a curated lookup (not algorithmic, so `missed_clockout` still renders "Missed
+clock-out" with the hyphen, not "Missed Clockout") covering every attendance/calendar/workflow status
+in the app, with an underscores-to-spaces fallback for anything unlisted. Used everywhere a raw status
+string used to leak through: Dashboard/Team history tables, `CorrectionRequestForm`'s status dropdown,
+and `CorrectionsList`'s old→new value diff.
 
-### Hide clock in/out entirely once done for the day
-*User's #16.* Since clock-in is now capped at once/day, showing a "Clock in" button that just 409s
-is bad UX. When `history` already has a closed record for today, replace the hero card's button with
-a "You're done for today" state instead of letting them tap it and get an error.
+### ~~Spelling / capitalization pass~~
+*User's #15.* Audited copy across the app (button labels, error messages, placeholders) — already
+consistent going in; the real capitalization bugs were the raw status strings above, now fixed.
 
-### Add requester detail to approval cards
-*User's #3.* `CorrectionsList.tsx` and `LeaveRequestsList.tsx` show the reason and old/new values but
-never the requester's name — an admin on the Approvals page can't tell who they're approving without
-cross-referencing. `corrections`/`leave_requests` rows have `requested_by` (a user id); join it to a
-name the same way `AttendanceRepository._flatten_user_name` does for attendance.
+### ~~Hide clock in/out entirely once done for the day~~
+*User's #16.* New `GET /attendance/today` returns the caller's own day detail for the org's local
+today (computed server-side, same as `/day/{day}` — the frontend never has to compute "today" itself).
+Dashboard shows a "You're done for today" message with a link to request a correction, instead of a
+"Clock in" button that would just 409. Found and fixed a related pre-existing bug while testing this:
+the hero's `openRecord` lookup didn't exclude `status === 'absent'`, so a historical auto-absent record
+(also `clock_out: null` by design) could be picked up as an active open shift.
 
-### Split corrections/leave into two pages on desktop
-*User's #13.* This session I deliberately combined them into one Requests page and one Approvals page
-to avoid nav bloat — you now want them separate for desktop. Straightforward: the components
-(`LeaveRequestsList`, `CorrectionsList`, `LeaveRequestForm`) already exist standalone, this is
-routing/page reorganization, not new logic. Consider: separate routes but keep a combined page on
-mobile (where nav real estate is tighter), or just always separate and lean on #6's collapsed nav.
+### ~~Add requester detail to approval cards~~
+*User's #3.* `CorrectionsRepository`/`LeaveRequestsRepository.list_all()` now embed
+`requester:users!requested_by(name)` (disambiguated — both tables have multiple FKs into `users`) and
+flatten it to `requested_by_name`. `CorrectionsList`/`LeaveRequestsList` take a new `showRequester`
+prop, on for the admin Approvals pages, off for the personal Requests pages (redundant there — it's
+always you).
 
-### Don't auto-create `absent` rows — describe the gap instead
-*User's #12.* Reverses part of what shipped this session. Right now the daily closeout job
-(`app/jobs/closeout.py`) inserts a real `attendance_records` row with `status='absent'` for anyone
-with no clock-in and no approved leave. You want it left alone — no synthetic row — with the UI just
-noting "didn't clock in" wherever a status would otherwise show. Good news: most of the plumbing
-already supports a `null` status gracefully (`build_personal_calendar`, `day_detail_for_user` already
-return `status: null` for days with nothing recorded) — this is more removal than addition. Decide
-what happens to the `absent` records already created by the shipped version (leave them as historical
-fact, or backfill-delete them) before flipping this off.
+### ~~Split corrections/leave into two pages on desktop~~
+*User's #13.* Went with "always separate, lean on #6's collapsed nav" — `Requests.tsx`/`Approvals.tsx`
+are gone, replaced by `LeaveRequests.tsx`/`CorrectionRequests.tsx` and `LeaveApprovals.tsx`/
+`CorrectionApprovals.tsx` at `/requests/leave`, `/requests/corrections`, `/approvals/leave`,
+`/approvals/corrections`. Old `/requests`/`/approvals` redirect to the `leave` variant for any
+existing bookmarks.
+
+### ~~Don't auto-create `absent` rows — describe the gap instead~~
+*User's #12.* The closeout job's absent-creation loop is gone; it now only flags `missed_clockout`.
+Existing auto-absent rows are left alone as historical fact rather than backfill-deleted — deleting
+real historical `attendance_records` outside the corrections flow would itself violate "no silent
+edits to attendance records". One real regression this required fixing: `compute_streak` used to
+anchor its backward walk on `max(dates_seen)` — the latest date with *any* record — which the old
+absent-auto-creation kept fresh every day. Without it, a stale record from days ago could anchor the
+walk and report an inflated streak. Fixed by anchoring on "today" (or yesterday, if today has no
+record yet) instead — verified with a synthetic stale-record test before it ever shipped.
 
 ---
 

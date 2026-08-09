@@ -49,21 +49,27 @@ def compute_streak(records: list[dict], working_days: set[int] | list[int], tz: 
     indices, Monday=0..Sunday=6) are skipped when checking for a gap rather
     than treated as a missed day, since assuming *every* day is a workday
     is itself an unstated schedule assumption — and the wrong one for orgs
-    that don't run every weekday."""
+    that don't run every weekday.
+
+    The walk starts from today (or yesterday, if today has no record yet —
+    so a streak isn't shown as broken mid-day before someone's had a chance
+    to clock in) rather than from the latest date with *any* record. The
+    closeout job used to auto-create an 'absent' row every day, which had
+    the side effect of keeping recent days "seen" even with no real
+    attendance — anchoring on `today` instead means the streak stays
+    accurate now that it doesn't."""
     working_days = set(working_days)
-    dates_seen: set[date] = set()
     attended_dates: set[date] = set()
     for record in records:
-        day = _to_local_date(record["clock_in"], tz)
-        dates_seen.add(day)
         if record["status"] != "absent":
-            attended_dates.add(day)
+            attended_dates.add(_to_local_date(record["clock_in"], tz))
 
-    if not dates_seen:
+    if not attended_dates:
         return 0
 
+    today = datetime.now(tz).date()
     streak = 0
-    cursor = max(dates_seen)
+    cursor = today if today in attended_dates else today - timedelta(days=1)
     while True:
         if cursor in attended_dates:
             streak += 1

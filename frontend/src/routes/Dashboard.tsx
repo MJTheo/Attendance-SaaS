@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, ApiError, type AttendanceRecord, type CorrectionFields, type UserProfile } from '../lib/api'
-import { StatusDot, statusToVariant } from '../components/StatusDot'
+import { api, ApiError, type AttendanceRecord, type CorrectionFields, type DayDetail, type UserProfile } from '../lib/api'
+import { StatusDot, formatStatusLabel, statusToVariant } from '../components/StatusDot'
 import { Header } from '../components/Header'
 import { CorrectionRequestForm } from '../components/CorrectionRequestForm'
 import { formatTimestamp } from '../lib/datetime'
@@ -12,6 +12,7 @@ export function Dashboard() {
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
   const [history, setHistory] = useState<AttendanceRecord[]>([])
   const [streak, setStreak] = useState(0)
+  const [todayDetail, setTodayDetail] = useState<DayDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [actionError, setActionError] = useState<string | null>(null)
   const [actionPending, setActionPending] = useState(false)
@@ -19,9 +20,10 @@ export function Dashboard() {
   const [correctingRecordId, setCorrectingRecordId] = useState<string | null>(null)
 
   const loadHistory = useCallback(async () => {
-    const [historyData, streakData] = await Promise.all([api.history(), api.streak()])
+    const [historyData, streakData, todayData] = await Promise.all([api.history(), api.streak(), api.myToday()])
     setHistory(historyData)
     setStreak(streakData.current_streak)
+    setTodayDetail(todayData)
   }, [])
 
   const load = useCallback(async () => {
@@ -66,7 +68,15 @@ export function Dashboard() {
     return <div className="flex min-h-screen items-center justify-center text-text-muted">Something went wrong.</div>
   }
 
-  const openRecord = history.find((record) => record.clock_out === null) ?? null
+  // status !== 'absent' excludes auto-absent records — those also carry
+  // clock_out = null by design (no clock-in ever happened), same reason
+  // the backend's AttendanceRepository.get_open_record() excludes them.
+  const openRecord = history.find((record) => record.clock_out === null && record.status !== 'absent') ?? null
+  // A closed record for today (the org's own local today, not the device's)
+  // means clock-in is capped for the day — showing "Clock in" at that point
+  // would just 409. todayDetail is null-safe for every other case (no
+  // record yet, on leave today) since those aren't "done for today".
+  const doneForToday = !openRecord && todayDetail?.clock_out != null
 
   async function handleClockIn() {
     setActionError(null)
@@ -146,6 +156,14 @@ export function Dashboard() {
                 Clock out
               </button>
             </div>
+          ) : doneForToday ? (
+            <div className="mx-auto max-w-sm rounded-lg border border-border bg-bg px-6 py-4 text-sm text-text-muted sm:py-5">
+              You're done for today. Made a mistake?{' '}
+              <Link to="/requests/corrections" className="text-text underline hover:text-status-good">
+                Request a correction
+              </Link>
+              .
+            </div>
           ) : (
             <button
               onClick={handleClockIn}
@@ -184,7 +202,7 @@ export function Dashboard() {
                   <Fragment key={record.id}>
                     <tr className="border-b border-border last:border-0">
                       <td className="px-2 py-2 sm:px-4">
-                        <StatusDot variant={statusToVariant(record.status)} label={record.status} />
+                        <StatusDot variant={statusToVariant(record.status)} label={formatStatusLabel(record.status)} />
                       </td>
                       <td className="px-2 py-2 text-text sm:px-4">{formatTimestamp(record.clock_in)}</td>
                       <td className="px-2 py-2 text-text sm:px-4">{formatTimestamp(record.clock_out)}</td>

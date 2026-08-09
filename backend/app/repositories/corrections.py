@@ -36,8 +36,24 @@ class CorrectionsRepository:
         # No role branching here: RLS already scopes this per caller — staff
         # see only their own requests, admins see every correction in their
         # org (see the two SELECT policies on `corrections`).
-        response = self._client.table("corrections").select("*").order("created_at", desc=True).execute()
-        return response.data
+        # `users!requested_by` disambiguates the embed: corrections has two
+        # FKs into users (requested_by, approved_by), so an unqualified
+        # `users(name)` embed would be ambiguous.
+        response = (
+            self._client.table("corrections")
+            .select("*, requester:users!requested_by(name)")
+            .order("created_at", desc=True)
+            .execute()
+        )
+        return self._flatten_requester_name(response.data)
+
+    @staticmethod
+    def _flatten_requester_name(rows: list[dict]) -> list[dict]:
+        records = []
+        for row in rows:
+            requester = row.pop("requester", None) or {}
+            records.append({**row, "requested_by_name": requester.get("name")})
+        return records
 
     def get(self, correction_id: str) -> dict | None:
         response = self._client.table("corrections").select("*").eq("id", correction_id).limit(1).execute()

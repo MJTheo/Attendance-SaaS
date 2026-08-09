@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import Client
@@ -119,4 +119,29 @@ def my_day(
     approved_leave = LeaveRequestsRepository(user_client).list_approved_in_range(day.isoformat(), day.isoformat())
     return day_detail_for_user(
         records, [leave for leave in approved_leave if leave["user_id"] == current_user.id], current_user.id, day, tz
+    )
+
+
+@router.get("/today", response_model=DayDetail)
+def my_today(
+    current_user: CurrentUser = Depends(decode_current_user),
+    user_client: Client = Depends(get_user_client),
+    profile: dict = Depends(require_profile),
+):
+    """Same shape as /day/{day}, for today (the org's own local today, not
+    the caller's device timezone) — lets the dashboard know whether to hide
+    the clock-in button (already have a closed record for today) without
+    the frontend needing to compute "today" itself."""
+    org = OrganizationsRepository(user_client).get(profile["org_id"])
+    tz = org_timezone(org)
+    today = datetime.now(tz).date()
+    range_start, range_end = local_day_bounds(today, tz)
+    records = AttendanceRepository(user_client).list_for_user_range(
+        current_user.id, range_start.isoformat(), range_end.isoformat()
+    )
+    approved_leave = LeaveRequestsRepository(user_client).list_approved_in_range(
+        today.isoformat(), today.isoformat()
+    )
+    return day_detail_for_user(
+        records, [leave for leave in approved_leave if leave["user_id"] == current_user.id], current_user.id, today, tz
     )

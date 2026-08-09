@@ -1,5 +1,5 @@
 import type { LeaveRequest } from '../lib/api'
-import { StatusDot, calendarStatusToVariant } from './StatusDot'
+import { StatusDot, calendarStatusToVariant, formatStatusLabel } from './StatusDot'
 
 function formatDate(value: string) {
   return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
@@ -14,11 +14,13 @@ function statusVariant(status: LeaveRequest['status']) {
 export function LeaveRequestsList({
   requests,
   showActions = false,
+  showRequester = false,
   onApprove,
   onReject,
 }: {
   requests: LeaveRequest[]
   showActions?: boolean
+  showRequester?: boolean
   onApprove?: (id: string) => void
   onReject?: (id: string) => void
 }) {
@@ -32,11 +34,14 @@ export function LeaveRequestsList({
         <div key={request.id} className="rounded-lg border border-border bg-surface p-4">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
             <div className="flex items-center gap-3">
-              <StatusDot variant={statusVariant(request.status)} label={request.status} />
+              <StatusDot variant={statusVariant(request.status)} label={formatStatusLabel(request.status)} />
               <StatusDot
                 variant={calendarStatusToVariant(request.leave_type === 'sick' ? 'sick_leave' : 'annual_leave')}
                 label={request.leave_type === 'sick' ? 'Sick leave' : 'Annual leave'}
               />
+              {showRequester && request.requested_by_name && (
+                <span className="font-mono text-xs text-text-muted">{request.requested_by_name}</span>
+              )}
             </div>
             <span className="font-mono text-xs text-text-muted">
               {formatDate(request.start_date)} – {formatDate(request.end_date)}

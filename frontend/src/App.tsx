@@ -5,8 +5,10 @@ import { Dashboard } from './routes/Dashboard'
 import { Team } from './routes/Team'
 import { Analytics } from './routes/Analytics'
 import { Calendar } from './routes/Calendar'
-import { Requests } from './routes/Requests'
-import { Approvals } from './routes/Approvals'
+import { LeaveRequests } from './routes/LeaveRequests'
+import { CorrectionRequests } from './routes/CorrectionRequests'
+import { LeaveApprovals } from './routes/LeaveApprovals'
+import { CorrectionApprovals } from './routes/CorrectionApprovals'
 import { AcceptInvite } from './routes/AcceptInvite'
 import { ProtectedRoute } from './routes/ProtectedRoute'
 
@@ -21,8 +23,12 @@ function App() {
           <Route path="/team" element={<Team />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/calendar" element={<Calendar />} />
-          <Route path="/requests" element={<Requests />} />
-          <Route path="/approvals" element={<Approvals />} />
+          <Route path="/requests" element={<Navigate to="/requests/leave" replace />} />
+          <Route path="/requests/leave" element={<LeaveRequests />} />
+          <Route path="/requests/corrections" element={<CorrectionRequests />} />
+          <Route path="/approvals" element={<Navigate to="/approvals/leave" replace />} />
+          <Route path="/approvals/leave" element={<LeaveApprovals />} />
+          <Route path="/approvals/corrections" element={<CorrectionApprovals />} />
           <Route path="/accept-invite" element={<AcceptInvite />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

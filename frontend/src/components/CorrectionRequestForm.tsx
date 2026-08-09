@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import type { AttendanceRecord, CorrectionFields } from '../lib/api'
+import { formatStatusLabel } from './StatusDot'
 import { fromDatetimeLocal, toDatetimeLocal } from '../lib/datetime'
 
 const STATUS_OPTIONS: AttendanceRecord['status'][] = [
@@ -94,7 +95,7 @@ export function CorrectionRequestForm({
           >
             {STATUS_OPTIONS.map((s) => (
               <option key={s} value={s}>
-                {s}
+                {formatStatusLabel(s)}
               </option>
             ))}
           </select>

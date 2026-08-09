@@ -12,7 +12,7 @@ import {
 } from '../lib/api'
 import { Header } from '../components/Header'
 import { Modal } from '../components/Modal'
-import { StatusDot, calendarStatusToVariant, type DotVariant } from '../components/StatusDot'
+import { StatusDot, calendarStatusToVariant, formatStatusLabel, type DotVariant } from '../components/StatusDot'
 import { isoDate, monthGridCells } from '../lib/period'
 
 function formatTime(value: string | null): string {
@@ -30,7 +30,7 @@ function DayDetailBody({ detail }: { detail: DayDetail }) {
   }
   return (
     <div>
-      <StatusDot variant={calendarStatusToVariant(detail.status)} label={STATUS_LABEL[detail.status]} />
+      <StatusDot variant={calendarStatusToVariant(detail.status)} label={formatStatusLabel(detail.status)} />
       {detail.leave_type ? (
         <p className="mt-2 font-mono text-sm text-text">{detail.leave_reason}</p>
       ) : detail.status === 'absent' ? (
@@ -54,7 +54,7 @@ function TeamDayDetailBody({ details }: { details: TeamDayDetail[] }) {
           <div className="mb-1 flex items-center justify-between">
             <span className="font-mono text-sm text-text">{detail.name}</span>
             {detail.status ? (
-              <StatusDot variant={calendarStatusToVariant(detail.status)} label={STATUS_LABEL[detail.status]} />
+              <StatusDot variant={calendarStatusToVariant(detail.status)} label={formatStatusLabel(detail.status)} />
             ) : (
               <span className="font-mono text-xs text-text-muted">No record</span>
             )}
@@ -71,16 +71,6 @@ function TeamDayDetailBody({ details }: { details: TeamDayDetail[] }) {
       ))}
     </div>
   )
-}
-
-const STATUS_LABEL: Record<CalendarStatus, string> = {
-  present: 'Present',
-  late: 'Late',
-  early_leave: 'Early leave',
-  absent: 'Absent',
-  missed_clockout: 'Missed clock-out',
-  sick_leave: 'Sick leave',
-  annual_leave: 'Annual leave',
 }
 
 const dotColorClass: Record<DotVariant, string> = {
@@ -176,7 +166,7 @@ function PersonalMonthGrid({
             {status && (
               <span className="flex items-center gap-1">
                 <span className={`h-1.5 w-1.5 rounded-full ${dotColorClass[variant!]}`} aria-hidden="true" />
-                <span className="truncate font-mono text-[0.65rem] text-text sm:text-xs">{STATUS_LABEL[status]}</span>
+                <span className="truncate font-mono text-[0.65rem] text-text sm:text-xs">{formatStatusLabel(status)}</span>
               </span>
             )}
           </button>
@@ -411,7 +401,7 @@ export function Calendar() {
             (status) => (
               <span key={status} className="flex items-center gap-1.5">
                 <span className={`h-2 w-2 rounded-full ${dotColorClass[calendarStatusToVariant(status)]}`} aria-hidden="true" />
-                {STATUS_LABEL[status]}
+                {formatStatusLabel(status)}
               </span>
             )
           )}

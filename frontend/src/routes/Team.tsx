@@ -11,7 +11,7 @@ import {
 } from '../lib/api'
 import { DEMO_ADMIN_EMAIL } from '../lib/demo'
 import { Header } from '../components/Header'
-import { StatusDot, statusToVariant } from '../components/StatusDot'
+import { StatusDot, formatStatusLabel, statusToVariant } from '../components/StatusDot'
 import { formatTimestamp } from '../lib/datetime'
 import { formatPeriodLabel, periodRange, shiftPeriod, type Granularity } from '../lib/period'
 
@@ -398,7 +398,7 @@ export function Team() {
                 {records.map((record) => (
                   <tr key={record.id} className="border-b border-border last:border-0">
                     <td className="px-2 py-2 sm:px-4">
-                      <StatusDot variant={statusToVariant(record.status)} label={record.status} />
+                      <StatusDot variant={statusToVariant(record.status)} label={formatStatusLabel(record.status)} />
                     </td>
                     <td className="px-2 py-2 text-text sm:px-4">{record.user_name}</td>
                     <td className="px-2 py-2 text-text sm:px-4">{formatTimestamp(record.clock_in)}</td>

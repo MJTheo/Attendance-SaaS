@@ -147,6 +147,7 @@ export interface LeaveRequest {
   reason: string
   status: 'pending' | 'approved' | 'rejected'
   requested_by: string
+  requested_by_name: string | null
   approved_by: string | null
   created_at: string
   resolved_at: string | null
@@ -178,6 +179,7 @@ export interface Correction {
   attendance_record_id: string
   org_id: string
   requested_by: string
+  requested_by_name: string | null
   approved_by: string | null
   reason: string
   old_value: CorrectionFields
@@ -250,5 +252,6 @@ export const api = {
       body: JSON.stringify({ role }),
     }),
   myDay: (isoDate: string) => apiFetch<DayDetail>(`/attendance/day/${isoDate}`),
+  myToday: () => apiFetch<DayDetail>('/attendance/today'),
   teamDay: (isoDate: string) => apiFetch<TeamDayDetail[]>(`/admin/day/${isoDate}`),
 }

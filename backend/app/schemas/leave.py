@@ -29,6 +29,7 @@ class LeaveRequest(BaseModel):
     reason: str
     status: str
     requested_by: str
+    requested_by_name: str | None = None
     approved_by: str | None
     created_at: datetime
     resolved_at: datetime | None

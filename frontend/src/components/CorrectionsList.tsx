@@ -1,6 +1,6 @@
 import type { Correction, CorrectionFields } from '../lib/api'
 import { formatTimestamp } from '../lib/datetime'
-import { StatusDot } from './StatusDot'
+import { StatusDot, formatStatusLabel } from './StatusDot'
 
 const FIELD_LABELS: Record<keyof CorrectionFields, string> = {
   clock_in: 'Clock in',
@@ -12,6 +12,7 @@ const FIELD_LABELS: Record<keyof CorrectionFields, string> = {
 function formatFieldValue(field: keyof CorrectionFields, value: string | undefined) {
   if (value === undefined || value === null) return '—'
   if (field === 'clock_in' || field === 'clock_out') return formatTimestamp(value)
+  if (field === 'status') return formatStatusLabel(value)
   return value
 }
 
@@ -24,11 +25,13 @@ function statusVariant(status: Correction['status']) {
 export function CorrectionsList({
   corrections,
   showActions = false,
+  showRequester = false,
   onApprove,
   onReject,
 }: {
   corrections: Correction[]
   showActions?: boolean
+  showRequester?: boolean
   onApprove?: (id: string) => void
   onReject?: (id: string) => void
 }) {
@@ -41,7 +44,12 @@ export function CorrectionsList({
       {corrections.map((correction) => (
         <div key={correction.id} className="rounded-lg border border-border bg-surface p-4">
           <div className="mb-2 flex items-center justify-between">
-            <StatusDot variant={statusVariant(correction.status)} label={correction.status} />
+            <div className="flex items-center gap-3">
+              <StatusDot variant={statusVariant(correction.status)} label={formatStatusLabel(correction.status)} />
+              {showRequester && correction.requested_by_name && (
+                <span className="font-mono text-xs text-text-muted">{correction.requested_by_name}</span>
+              )}
+            </div>
             <span className="font-mono text-xs text-text-muted">{formatTimestamp(correction.created_at)}</span>
           </div>
           <p className="mb-2 font-mono text-sm text-text">{correction.reason}</p>

@@ -30,6 +30,7 @@ class Correction(BaseModel):
     attendance_record_id: str
     org_id: str
     requested_by: str
+    requested_by_name: str | None = None
     approved_by: str | None
     reason: str
     old_value: dict[str, Any]
