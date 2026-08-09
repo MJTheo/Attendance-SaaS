@@ -26,24 +26,29 @@ ordering.
 
 ## Tier 0 — Foundational (unlocks other items below)
 
-### Super admin role
-*User's #2.* Add a `super_admin` role alongside `admin`/`staff` (or a boolean flag on top of
-`admin` — decide which when we start; a flag is less migration churn but a distinct role is cleaner
-for RLS policies). Needs: enum/schema change on `users.role`, new RLS policies wherever `app.is_admin()`
-is currently the gate but the action should be super-admin-only, and a `require_super_admin`
-dependency mirroring `require_admin` in `dependencies.py`. Blocks #1, #4, #7, #17, and the
-"can edit company logo/color scheme" part of #1.
-**Open question:** exactly one super admin per org, or several? Can a super admin demote themselves?
+### ~~Super admin role~~ — done, shipped 2026-08-09
+*User's #2.* `super_admin` is a distinct `users.role` value (not a flag on `admin`), and
+`app.is_admin()` treats it as a superset so every existing admin-gated policy/route/UI check already
+covers it — see `isAdmin()` in `frontend/src/lib/api.ts` and `require_admin` in
+`backend/app/dependencies.py`. Role changes go through a new `PATCH /admin/users/{id}/role`
+(`require_super_admin`-gated) plus a DB-level `users_role_change_guard` trigger — any number of super
+admins per org, self-demotion out of super_admin blocked at the DB layer. The org's creator becomes
+its first super admin at signup (otherwise a new org would have nobody able to ever promote anyone);
+existing orgs' admins were backfilled to super_admin for the same reason. Managed from a new "Team
+roles" section on the Team page, visible to super admins only. This unlocks #1, #4, #7, #17, and the
+company-page logo/color-scheme item below.
 
-### Configurable working days (arbitrary days, not just "first N")
-*User's #18.* Today `organizations.working_days` is an int (5/6/7) interpreted as "the first N
-weekdays, Monday-first" — see `backend/app/services/analytics_service.py`. A company running
-Tue–Sat can't express that. Needs: replace the int with a day-of-week set (e.g. a `smallint` bitmask
-or a `weekday_start`/`weekday_count`-with-offset pair — bitmask is more flexible, worth it here).
-Every consumer of `working_days` needs updating: `compute_streak`, `late_rate_by_weekday`,
-`app/jobs/closeout.py`'s non-working-day skip, and the frontend `WORKING_DAYS_LABEL` /
-`Team.tsx` settings UI. Do this **before** #4 (holidays) and #7 (shift times) — both need a correct
-notion of "is this a working day" to build on.
+### ~~Configurable working days (arbitrary days, not just "first N")~~ — done, drafted 2026-08-09
+*User's #18.* `organizations.working_days` is now a 7-bit mask (bit i = weekday i is a working day,
+Monday=0..Sunday=6), replacing the old "5/6/7 = the first N weekdays" int — an org can express e.g.
+Tue–Sat now. The mask only exists at the storage boundary (`repositories/organizations.py`'s
+`mask_to_days`/`days_to_mask`); everything above that (`compute_streak`, `late_rate_by_weekday`,
+the closeout job's non-working-day skip, `PATCH /admin/settings`) works with a plain list of weekday
+indices. `Team.tsx`'s settings UI is now a 7-button Mon–Sun toggle row instead of a 5/6/7 dropdown.
+**Written but not yet applied/live-tested** — needs migration `20260809100000_working_days_bitmask.sql`
+run first (backfills old N values into the equivalent mask, preserving current behavior exactly).
+This unlocks #4 (holidays) and #7 (shift times), both of which need a correct "is this a working day"
+to build on.
 
 ### Timezone handling
 *Not in your list — I noticed this while building the closeout job and want to flag it before more

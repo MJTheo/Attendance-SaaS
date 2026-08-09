@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import Client
 
 from app.config import get_settings
-from app.dependencies import get_service_role_client, get_user_client, require_admin
+from app.dependencies import get_service_role_client, get_user_client, require_admin, require_super_admin
 from app.repositories.attendance import AttendanceRepository
 from app.repositories.leave_requests import LeaveRequestsRepository
 from app.repositories.organizations import OrganizationsRepository
@@ -14,6 +14,7 @@ from app.schemas.analytics import CalendarDay, DayStatusCounts, Report, TeamAnal
 from app.schemas.attendance import TeamAttendanceRecord
 from app.schemas.auth import InviteRequest, UserProfile
 from app.schemas.organization import OrgSettings, UpdateOrgSettings
+from app.schemas.user import UpdateUserRole
 from app.services.analytics_service import (
     build_personal_calendar,
     daily_trend,
@@ -132,6 +133,21 @@ def list_team_members(
     admin: dict = Depends(require_admin),
 ):
     return UsersRepository(user_client).list_for_org()
+
+
+@router.patch("/users/{user_id}/role", response_model=UserProfile)
+def update_user_role(
+    user_id: str,
+    payload: UpdateUserRole,
+    user_client: Client = Depends(get_user_client),
+    super_admin: dict = Depends(require_super_admin),
+):
+    if user_id == super_admin["id"] and payload.role != "super_admin":
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "You can't remove your own super admin role")
+    updated = UsersRepository(user_client).update_role(user_id, payload.role)
+    if updated is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
+    return updated
 
 
 @router.get("/settings", response_model=OrgSettings)

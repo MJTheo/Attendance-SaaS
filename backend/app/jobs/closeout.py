@@ -4,6 +4,7 @@ from supabase import Client
 
 from app.repositories.attendance import AttendanceRepository
 from app.repositories.leave_requests import LeaveRequestsRepository
+from app.repositories.organizations import mask_to_days
 from app.repositories.users import UsersRepository
 
 
@@ -40,10 +41,10 @@ def close_out_previous_day(service_client: Client) -> None:
 
     orgs = service_client.table("organizations").select("id, working_days").execute().data
     for org in orgs:
-        _close_out_org_day(service_client, org["id"], org["working_days"], target_day)
+        _close_out_org_day(service_client, org["id"], mask_to_days(org["working_days"]), target_day)
 
 
-def _close_out_org_day(service_client: Client, org_id: str, working_days: int, day: date) -> None:
+def _close_out_org_day(service_client: Client, org_id: str, working_days: list[int], day: date) -> None:
     attendance = AttendanceRepository(service_client)
     day_start = datetime.combine(day, datetime.min.time(), tzinfo=timezone.utc)
     day_end = day_start + timedelta(days=1)
@@ -64,7 +65,7 @@ def _close_out_org_day(service_client: Client, org_id: str, working_days: int, d
                 record["id"], {"status": "missed_clockout", "clock_out": day_end.isoformat()}
             )
 
-    if day.weekday() >= working_days:
+    if day.weekday() not in working_days:
         return  # non-working day — nobody was expected to clock in
 
     users_with_records = {r["user_id"] for r in org_records}

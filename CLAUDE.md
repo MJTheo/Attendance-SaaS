@@ -24,8 +24,8 @@ These are non-negotiable — flag it rather than working around them:
 
 ## Data model
 
-- `organizations` — id, name, plan, created_at, working_days (5/6/7, Monday-first)
-- `users` — id, org_id (FK), role (admin/staff), name, email
+- `organizations` — id, name, plan, created_at, working_days (bitmask of the weekdays this org operates, Monday=0..Sunday=6 — an arbitrary subset, not just "the first N days")
+- `users` — id, org_id (FK), role (admin/staff/super_admin), name, email
 - `attendance_records` — id, org_id, user_id, clock_in, clock_out, status, notes
 - `corrections` — id, attendance_record_id, requested_by, approved_by, reason, old_value, new_value, status, created_at
 - `leave_requests` — id, org_id, user_id, leave_type (sick/annual), start_date, end_date, reason, status, requested_by, approved_by, created_at, resolved_at
@@ -37,6 +37,7 @@ Attendance status values: `present`, `late`, `early_leave`, `absent`, `missed_cl
 
 - **staff** — clock in/out, view own history and streak, submit correction requests
 - **admin** — everything staff can do, plus team dashboard, approve/reject corrections, view pattern analytics, configure org settings
+- **super_admin** — everything admin can do, plus promote/demote other users' roles. A super admin can't remove their own super_admin role (DB-enforced, so an org can never lock itself out); the org's creator becomes its first super admin at signup, since only a super admin can ever create another one.
 
 ## Build phases
 

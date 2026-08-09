@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { api, type Report, type TeamAnalytics, type UserProfile } from '../lib/api'
+import { api, isAdmin, type Report, type TeamAnalytics, type UserProfile } from '../lib/api'
 import { Header } from '../components/Header'
 import { formatTimestamp } from '../lib/datetime'
 import { TrendChart } from '../components/charts/TrendChart'
@@ -23,7 +23,7 @@ export function Analytics() {
     try {
       const me = await api.me()
       setProfile(me)
-      if (me.role !== 'admin') return
+      if (!isAdmin(me)) return
       const [analyticsData, reportsData] = await Promise.all([api.analytics(), api.reports()])
       setAnalytics(analyticsData)
       setReports(reportsData)
@@ -46,7 +46,7 @@ export function Analytics() {
     return <div className="flex min-h-screen items-center justify-center text-text-muted">Something went wrong.</div>
   }
 
-  if (profile.role !== 'admin') {
+  if (!isAdmin(profile)) {
     return <Navigate to="/" replace />
   }
 

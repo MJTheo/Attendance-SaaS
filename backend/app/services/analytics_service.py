@@ -15,16 +15,17 @@ def _to_date(value: str | datetime) -> date:
     return datetime.fromisoformat(value).date()
 
 
-def compute_streak(records: list[dict], working_days: int = 5) -> int:
+def compute_streak(records: list[dict], working_days: set[int] | list[int] = (0, 1, 2, 3, 4)) -> int:
     """Consecutive most-recent calendar days with at least one non-absent
     record, no gaps. Grounded only in records that actually exist — there's
     no shift-schedule concept yet (see AttendanceService._determine_clock_in_status),
     so a day with no record at all isn't assumed to be a missed workday,
-    with one narrow exception: non-working days (per the org's working_days,
-    counted Monday-first) are skipped when checking for a gap rather than
-    treated as a missed day, since assuming *every* day is a workday is
-    itself an unstated schedule assumption — and the wrong one for orgs that
-    don't run a 7-day week."""
+    with one narrow exception: non-working days (per the org's working_days —
+    a set of weekday indices, Monday=0..Sunday=6) are skipped when checking
+    for a gap rather than treated as a missed day, since assuming *every* day
+    is a workday is itself an unstated schedule assumption — and the wrong
+    one for orgs that don't run every weekday."""
+    working_days = set(working_days)
     dates_seen: set[date] = set()
     attended_dates: set[date] = set()
     for record in records:
@@ -41,7 +42,7 @@ def compute_streak(records: list[dict], working_days: int = 5) -> int:
     while True:
         if cursor in attended_dates:
             streak += 1
-        elif cursor.weekday() >= working_days:
+        elif cursor.weekday() not in working_days:
             pass  # non-working day with nothing recorded — not a gap, keep walking back
         else:
             break
@@ -77,9 +78,10 @@ def summarize_users(team_records: list[dict]) -> list[dict]:
     return summaries
 
 
-def late_rate_by_weekday(team_records: list[dict], working_days: int = 5) -> list[dict]:
-    """Breakdown for weekday indices 0..working_days-1 (Monday-first) only —
-    non-working days are dropped rather than rendered as an always-empty row."""
+def late_rate_by_weekday(team_records: list[dict], working_days: set[int] | list[int] = (0, 1, 2, 3, 4)) -> list[dict]:
+    """Breakdown for the org's working weekday indices (Monday=0..Sunday=6)
+    only — non-working days are dropped rather than rendered as an
+    always-empty row."""
     totals: dict[int, int] = defaultdict(int)
     late: dict[int, int] = defaultdict(int)
     for record in team_records:
@@ -95,7 +97,7 @@ def late_rate_by_weekday(team_records: list[dict], working_days: int = 5) -> lis
             "late": late.get(i, 0),
             "late_rate": round(late.get(i, 0) / totals[i], 3) if totals.get(i) else 0.0,
         }
-        for i in range(working_days)
+        for i in sorted(working_days)
     ]
 
 

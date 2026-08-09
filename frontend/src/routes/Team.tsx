@@ -1,16 +1,41 @@
-import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
-import { api, type OrgSettings, type TeamAttendanceRecord, type UserProfile } from '../lib/api'
+import {
+  api,
+  isAdmin,
+  type OrgSettings,
+  type Role,
+  type TeamAttendanceRecord,
+  type UserProfile,
+  type Weekday,
+} from '../lib/api'
 import { DEMO_ADMIN_EMAIL } from '../lib/demo'
 import { Header } from '../components/Header'
 import { StatusDot, statusToVariant } from '../components/StatusDot'
 import { formatTimestamp } from '../lib/datetime'
 import { formatPeriodLabel, periodRange, shiftPeriod, type Granularity } from '../lib/period'
 
-const WORKING_DAYS_LABEL: Record<number, string> = {
-  5: '5 days/week (Mon–Fri)',
-  6: '6 days/week (Mon–Sat)',
-  7: '7 days/week (Mon–Sun)',
+const WEEKDAYS: { value: Weekday; short: string; full: string }[] = [
+  { value: 0, short: 'Mon', full: 'Monday' },
+  { value: 1, short: 'Tue', full: 'Tuesday' },
+  { value: 2, short: 'Wed', full: 'Wednesday' },
+  { value: 3, short: 'Thu', full: 'Thursday' },
+  { value: 4, short: 'Fri', full: 'Friday' },
+  { value: 5, short: 'Sat', full: 'Saturday' },
+  { value: 6, short: 'Sun', full: 'Sunday' },
+]
+
+function describeWorkingDays(days: number[]): string {
+  const set = new Set(days)
+  return WEEKDAYS.filter((d) => set.has(d.value))
+    .map((d) => d.full)
+    .join(', ')
+}
+
+const ROLE_LABEL: Record<Role, string> = {
+  staff: 'Staff',
+  admin: 'Admin',
+  super_admin: 'Super admin',
 }
 
 export function Team() {
@@ -28,20 +53,37 @@ export function Team() {
   const [savingSettings, setSavingSettings] = useState(false)
   const [granularity, setGranularity] = useState<Granularity>('week')
   const [reference, setReference] = useState(() => new Date())
+  const [members, setMembers] = useState<UserProfile[]>([])
+  const [roleUpdatingId, setRoleUpdatingId] = useState<string | null>(null)
+  const [roleError, setRoleError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const me = await api.me()
       setProfile(me)
-      if (me.role !== 'admin') return
+      if (!isAdmin(me)) return
       setOrgSettings(await api.orgSettings())
+      if (me.role === 'super_admin') setMembers(await api.teamMembers())
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load')
     } finally {
       setLoading(false)
     }
   }, [])
+
+  async function handleRoleChange(userId: string, role: Role) {
+    setRoleError(null)
+    setRoleUpdatingId(userId)
+    try {
+      const updated = await api.updateUserRole(userId, role)
+      setMembers((current) => current.map((m) => (m.id === updated.id ? updated : m)))
+    } catch (err) {
+      setRoleError(err instanceof Error ? err.message : 'Failed to update role')
+    } finally {
+      setRoleUpdatingId(null)
+    }
+  }
 
   useEffect(() => {
     load()
@@ -61,11 +103,18 @@ export function Team() {
   }, [reference, granularity])
 
   useEffect(() => {
-    if (profile?.role === 'admin') loadAttendance()
+    if (profile && isAdmin(profile)) loadAttendance()
   }, [profile, loadAttendance])
 
-  async function handleWorkingDaysChange(event: ChangeEvent<HTMLSelectElement>) {
-    const workingDays = Number(event.target.value) as 5 | 6 | 7
+  async function handleWorkingDayToggle(day: Weekday) {
+    if (!orgSettings) return
+    const set = new Set(orgSettings.working_days)
+    if (set.has(day)) {
+      set.delete(day)
+    } else {
+      set.add(day)
+    }
+    const workingDays = [...set].sort((a, b) => a - b) as Weekday[]
     setError(null)
     setSavingSettings(true)
     try {
@@ -105,7 +154,7 @@ export function Team() {
     return <div className="flex min-h-screen items-center justify-center text-text-muted">Something went wrong.</div>
   }
 
-  if (profile.role !== 'admin') {
+  if (!isAdmin(profile)) {
     return <Navigate to="/" replace />
   }
 
@@ -123,30 +172,74 @@ export function Team() {
             <h2 className="mb-3 font-sans text-sm font-semibold uppercase tracking-wide text-text-muted">
               Organization settings
             </h2>
-            <label className="block">
-              <span className="mb-1 block font-mono text-xs uppercase tracking-wide text-text-muted">
-                Working days
-              </span>
-              {profile.email !== DEMO_ADMIN_EMAIL ? (
-                <select
-                  value={orgSettings.working_days}
-                  onChange={handleWorkingDaysChange}
-                  disabled={savingSettings}
-                  className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-status-good disabled:opacity-50 sm:w-auto"
-                >
-                  {[5, 6, 7].map((n) => (
-                    <option key={n} value={n}>
-                      {WORKING_DAYS_LABEL[n]}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <p className="font-mono text-sm text-text">{WORKING_DAYS_LABEL[orgSettings.working_days]}</p>
-              )}
-            </label>
+            <span className="mb-1 block font-mono text-xs uppercase tracking-wide text-text-muted">
+              Working days
+            </span>
+            {profile.email !== DEMO_ADMIN_EMAIL ? (
+              <div className="flex flex-wrap gap-1.5">
+                {WEEKDAYS.map((day) => {
+                  const active = orgSettings.working_days.includes(day.value)
+                  return (
+                    <button
+                      key={day.value}
+                      type="button"
+                      onClick={() => handleWorkingDayToggle(day.value)}
+                      disabled={savingSettings}
+                      aria-pressed={active}
+                      title={day.full}
+                      className={`w-14 rounded-md border px-2 py-1.5 font-mono text-xs disabled:opacity-50 ${
+                        active
+                          ? 'border-status-good bg-status-good text-bg'
+                          : 'border-border text-text-muted hover:text-text'
+                      }`}
+                    >
+                      {day.short}
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="font-mono text-sm text-text">{describeWorkingDays(orgSettings.working_days)}</p>
+            )}
             <p className="mt-2 font-mono text-xs text-text-muted">
               Controls which weekdays show up in analytics and which days count toward streaks.
             </p>
+          </section>
+        )}
+
+        {profile.role === 'super_admin' && (
+          <section className="mb-8 rounded-lg border border-border bg-surface p-4 sm:p-6">
+            <h2 className="mb-3 font-sans text-sm font-semibold uppercase tracking-wide text-text-muted">
+              Team roles
+            </h2>
+            {roleError && <p className="mb-3 font-mono text-xs text-status-warning">{roleError}</p>}
+            <div className="flex flex-col gap-2">
+              {members.map((member) => {
+                const isSelf = member.id === profile.id
+                const lockedSuperAdmin = isSelf && member.role === 'super_admin'
+                return (
+                  <div key={member.id} className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-mono text-sm text-text">
+                      {member.name}
+                      {isSelf && <span className="text-text-muted"> (you)</span>}
+                    </span>
+                    <select
+                      value={member.role}
+                      onChange={(e) => handleRoleChange(member.id, e.target.value as Role)}
+                      disabled={roleUpdatingId === member.id || lockedSuperAdmin}
+                      title={lockedSuperAdmin ? "You can't remove your own super admin role" : undefined}
+                      className="rounded-md border border-border bg-bg px-2 py-1.5 font-mono text-xs text-text outline-none focus:border-status-good disabled:opacity-50"
+                    >
+                      {(Object.keys(ROLE_LABEL) as Role[]).map((role) => (
+                        <option key={role} value={role}>
+                          {ROLE_LABEL[role]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )
+              })}
+            </div>
           </section>
         )}
 

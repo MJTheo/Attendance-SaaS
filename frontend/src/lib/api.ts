@@ -35,12 +35,20 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   return response.json() as Promise<T>
 }
 
+export type Role = 'staff' | 'admin' | 'super_admin'
+
 export interface UserProfile {
   id: string
   org_id: string
-  role: 'admin' | 'staff'
+  role: Role
   name: string
   email: string
+}
+
+// super_admin is a superset of admin — everywhere an 'admin' check gates a
+// view or action, a super admin should pass too.
+export function isAdmin(profile: Pick<UserProfile, 'role'>): boolean {
+  return profile.role === 'admin' || profile.role === 'super_admin'
 }
 
 export interface AttendanceRecord {
@@ -157,8 +165,11 @@ export interface Report {
   }
 }
 
+// Monday=0..Sunday=6, matching the backend's date.weekday() convention.
+export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6
+
 export interface OrgSettings {
-  working_days: 5 | 6 | 7
+  working_days: Weekday[]
 }
 
 export interface Correction {
@@ -212,7 +223,7 @@ export const api = {
   analytics: () => apiFetch<TeamAnalytics>('/admin/analytics'),
   reports: () => apiFetch<Report[]>('/admin/reports'),
   orgSettings: () => apiFetch<OrgSettings>('/admin/settings'),
-  updateOrgSettings: (workingDays: 5 | 6 | 7) =>
+  updateOrgSettings: (workingDays: Weekday[]) =>
     apiFetch<OrgSettings>('/admin/settings', {
       method: 'PATCH',
       body: JSON.stringify({ working_days: workingDays }),
@@ -232,6 +243,11 @@ export const api = {
   teamMemberCalendar: (userId: string, year: number, month: number) =>
     apiFetch<CalendarDay[]>(`/admin/calendar/${userId}?year=${year}&month=${month}`),
   teamMembers: () => apiFetch<UserProfile[]>('/admin/users'),
+  updateUserRole: (userId: string, role: Role) =>
+    apiFetch<UserProfile>(`/admin/users/${userId}/role`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
+    }),
   myDay: (isoDate: string) => apiFetch<DayDetail>(`/attendance/day/${isoDate}`),
   teamDay: (isoDate: string) => apiFetch<TeamDayDetail[]>(`/admin/day/${isoDate}`),
 }

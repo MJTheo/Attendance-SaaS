@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { api, type Correction, type LeaveRequest, type UserProfile } from '../lib/api'
+import { api, isAdmin, type Correction, type LeaveRequest, type UserProfile } from '../lib/api'
 import { Header } from '../components/Header'
 import { CorrectionsList } from '../components/CorrectionsList'
 import { LeaveRequestsList } from '../components/LeaveRequestsList'
@@ -17,7 +17,7 @@ export function Approvals() {
     try {
       const me = await api.me()
       setProfile(me)
-      if (me.role !== 'admin') return
+      if (!isAdmin(me)) return
       const [allCorrections, allLeaveRequests] = await Promise.all([api.corrections(), api.leaveRequests()])
       setCorrections(allCorrections)
       setLeaveRequests(allLeaveRequests)
@@ -80,7 +80,7 @@ export function Approvals() {
     return <div className="flex min-h-screen items-center justify-center text-text-muted">Something went wrong.</div>
   }
 
-  if (profile.role !== 'admin') {
+  if (!isAdmin(profile)) {
     return <Navigate to="/" replace />
   }
 

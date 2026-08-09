@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   api,
+  isAdmin,
   type CalendarDay,
   type CalendarStatus,
   type DayDetail,
@@ -260,21 +261,21 @@ export function Calendar() {
   }, [])
 
   useEffect(() => {
-    if (profile?.role === 'admin') {
+    if (profile && isAdmin(profile)) {
       api.teamMembers().then(setMembers).catch(() => setMembers([]))
     }
   }, [profile])
 
-  const drilldown = view === 'team' && profile?.role === 'admin' && selectedMemberId !== ''
+  const drilldown = view === 'team' && !!profile && isAdmin(profile) && selectedMemberId !== ''
 
   const load = useCallback(async () => {
     if (!profile) return
     setLoading(true)
     setError(null)
     try {
-      if (view === 'team' && profile.role === 'admin' && selectedMemberId) {
+      if (view === 'team' && isAdmin(profile) && selectedMemberId) {
         setPersonalDays(await api.teamMemberCalendar(selectedMemberId, year, month))
-      } else if (view === 'team' && profile.role === 'admin') {
+      } else if (view === 'team' && isAdmin(profile)) {
         setTeamDays(await api.teamCalendar(year, month))
       } else {
         setPersonalDays(await api.myCalendar(year, month))
@@ -311,9 +312,9 @@ export function Calendar() {
     setDayDetail(null)
     setTeamDayDetail(null)
     try {
-      if (view === 'team' && profile!.role === 'admin' && !selectedMemberId) {
+      if (view === 'team' && isAdmin(profile!) && !selectedMemberId) {
         setTeamDayDetail(await api.teamDay(iso))
-      } else if (view === 'team' && profile!.role === 'admin' && selectedMemberId) {
+      } else if (view === 'team' && isAdmin(profile!) && selectedMemberId) {
         const all = await api.teamDay(iso)
         setDayDetail(all.find((d) => d.user_id === selectedMemberId) ?? null)
       } else {
@@ -341,7 +342,7 @@ export function Calendar() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <h1 className="font-sans text-lg font-semibold text-text">Calendar</h1>
-            {profile.role === 'admin' && (
+            {isAdmin(profile) && (
               <div className="flex overflow-hidden rounded-md border border-border font-mono text-xs">
                 <button
                   onClick={() => handleViewChange('mine')}
@@ -357,7 +358,7 @@ export function Calendar() {
                 </button>
               </div>
             )}
-            {view === 'team' && profile.role === 'admin' && (
+            {view === 'team' && isAdmin(profile) && (
               <select
                 value={selectedMemberId}
                 onChange={(e) => setSelectedMemberId(e.target.value)}
@@ -385,7 +386,7 @@ export function Calendar() {
 
         {loading ? (
           <p className="font-mono text-sm text-text-muted">Loading…</p>
-        ) : view === 'team' && profile.role === 'admin' && !drilldown ? (
+        ) : view === 'team' && isAdmin(profile) && !drilldown ? (
           <TeamMonthGrid year={year} month={month} days={teamDays} onDayClick={handleDayClick} />
         ) : (
           <PersonalMonthGrid year={year} month={month} days={personalDays} onDayClick={handleDayClick} />

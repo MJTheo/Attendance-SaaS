@@ -1,5 +1,7 @@
 from pydantic import BaseModel
 
+from app.schemas.user import Role
+
 
 class SignupRequest(BaseModel):
     org_name: str
@@ -15,6 +17,6 @@ class InviteRequest(BaseModel):
 class UserProfile(BaseModel):
     id: str
     org_id: str
-    role: str
+    role: Role
     name: str
     email: str

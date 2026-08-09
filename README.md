@@ -29,8 +29,8 @@ The non-negotiable rules this project was built around:
 
 ### Data model
 
-- `organizations` — id, name, plan, created_at, working_days (5/6/7, Monday-first — which weekdays this org operates)
-- `users` — id (= `auth.users.id`), org_id, role (`admin` / `staff`), name, email
+- `organizations` — id, name, plan, created_at, working_days (bitmask of the weekdays this org operates, Monday=0..Sunday=6 — any subset, e.g. Tue-Sat, not just "the first N days")
+- `users` — id (= `auth.users.id`), org_id, role (`admin` / `staff` / `super_admin`), name, email
 - `attendance_records` — id, org_id, user_id, clock_in, clock_out, status, notes
 - `corrections` — id, attendance_record_id, org_id, requested_by, approved_by, reason, old_value, new_value, status, created_at, resolved_at
 - `leave_requests` — id, org_id, user_id, leave_type (`sick` / `annual`), start_date, end_date, reason, status, requested_by, approved_by, created_at, resolved_at
@@ -44,6 +44,8 @@ The non-negotiable rules this project was built around:
 - **Creating a new org requires a TOTP access code** (`/auth/signup`'s "Access code" field), same rotating-code mechanism as an authenticator app — keeps a public deployment from letting random visitors spin up real orgs, without a static secret sitting in the signup form.
 - **The status palette grew from 3 colors to 5** when sick/annual leave were added. The original design language reserved teal/amber/slate for good/warning/neutral; a calendar showing 6 status types with only 3 colors would've been unreadable, so two more (sky for sick leave, violet for annual leave) were added as a deliberate, documented extension rather than overloading an existing color with a second meaning.
 - **Analytics trend/distribution cover a trailing 30-day window**, not all-time, so the payload stays bounded regardless of how long an org has been running.
+- **`super_admin` is a distinct role value, not a flag on top of `admin`**, and `app.is_admin()` treats it as a superset — a super admin passes every existing admin check without duplicating policies. Role changes are gated by a dedicated `app.is_super_admin()` check and a DB trigger (`users_role_change_guard`), not RLS alone, because RLS is row-level and can't stop an admin from rewriting just the `role` column on an otherwise-permitted update. An org can have any number of super admins, and the trigger blocks a super admin from removing their own super_admin role — the one thing worth hard-blocking, since it's the only way an org could lock itself out of ever promoting anyone again.
+- **`organizations.working_days` is stored as a 7-bit mask, not an int count.** The original "5/6/7 = the first N weekdays" design couldn't express a Tue–Sat schedule. The mask only exists at the storage boundary (`repositories/organizations.py`'s `mask_to_days`/`days_to_mask`) — every consumer (streak calculation, the late-rate-by-weekday chart, the daily closeout job's non-working-day check, the settings UI) works with a plain list of weekday indices.
 
 ## Local development
 

@@ -30,3 +30,12 @@ class UsersRepository:
             query = query.eq("org_id", org_id)
         response = query.order("name").execute()
         return response.data
+
+    def update_role(self, user_id: str, role: str) -> dict | None:
+        # RLS scopes this to the caller's org — a cross-org user_id comes
+        # back as a zero-row update, not an error. The "only a super admin,
+        # never your own super_admin role" rule is enforced router-side
+        # (see admin.update_user_role) and, as defense in depth, by the
+        # users_role_change_guard DB trigger.
+        response = self._client.table("users").update({"role": role}).eq("id", user_id).execute()
+        return response.data[0] if response.data else None

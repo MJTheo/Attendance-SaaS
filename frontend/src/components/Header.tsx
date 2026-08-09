@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import type { UserProfile } from '../lib/api'
+import { isAdmin, type UserProfile } from '../lib/api'
 import { Brand } from './Brand'
 import { ThemeToggle } from './ThemeToggle'
 
@@ -15,7 +15,9 @@ export function Header({ profile }: { profile: UserProfile }) {
         <Brand className="pr-3 sm:border-r sm:border-border sm:pr-6" />
         <div>
           <p className="font-sans text-base font-semibold text-text sm:text-lg">{profile.name}</p>
-          <p className="font-mono text-xs uppercase tracking-wide text-text-muted">{profile.role}</p>
+          <p className="font-mono text-xs uppercase tracking-wide text-text-muted">
+            {profile.role.replace('_', ' ')}
+          </p>
         </div>
         <nav className="flex flex-wrap gap-4 font-mono text-sm">
           <NavLink to="/" end className={navLinkClass}>
@@ -27,7 +29,7 @@ export function Header({ profile }: { profile: UserProfile }) {
           <NavLink to="/requests" className={navLinkClass}>
             Requests
           </NavLink>
-          {profile.role === 'admin' && (
+          {isAdmin(profile) && (
             <>
               <NavLink to="/approvals" className={navLinkClass}>
                 Approvals

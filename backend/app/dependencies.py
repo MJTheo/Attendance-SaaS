@@ -55,6 +55,12 @@ def require_profile(
 
 
 def require_admin(profile: dict = Depends(require_profile)) -> dict:
-    if profile["role"] != "admin":
+    if profile["role"] not in ("admin", "super_admin"):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Admin only")
+    return profile
+
+
+def require_super_admin(profile: dict = Depends(require_profile)) -> dict:
+    if profile["role"] != "super_admin":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Super admin only")
     return profile
