@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { api, isAdmin, type LeaveRequest, type UserProfile } from '../lib/api'
-import { Header } from '../components/Header'
+import { AppShell } from '../components/AppShell'
 import { LeaveRequestsList } from '../components/LeaveRequestsList'
 
 export function LeaveApprovals() {
@@ -64,9 +64,7 @@ export function LeaveApprovals() {
   const resolvedLeaveRequests = leaveRequests.filter((l) => l.status !== 'pending')
 
   return (
-    <div className="min-h-screen">
-      <Header profile={profile} />
-
+    <AppShell profile={profile}>
       <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
         <h1 className="mb-4 font-sans text-lg font-semibold text-text">Leave approvals</h1>
 
@@ -98,6 +96,6 @@ export function LeaveApprovals() {
           </section>
         )}
       </main>
-    </div>
+    </AppShell>
   )
 }

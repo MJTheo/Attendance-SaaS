@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { api, isAdmin, type Report, type TeamAnalytics, type UserProfile } from '../lib/api'
-import { Header } from '../components/Header'
+import { AppShell } from '../components/AppShell'
 import { formatTimestamp } from '../lib/datetime'
 import { TrendChart } from '../components/charts/TrendChart'
 import { DonutChart } from '../components/charts/DonutChart'
@@ -51,9 +51,7 @@ export function Analytics() {
   }
 
   return (
-    <div className="min-h-screen">
-      <Header profile={profile} />
-
+    <AppShell profile={profile}>
       <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
         <h1 className="mb-4 font-sans text-lg font-semibold text-text">Analytics</h1>
 
@@ -185,6 +183,6 @@ export function Analytics() {
           )}
         </section>
       </main>
-    </div>
+    </AppShell>
   )
 }

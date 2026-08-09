@@ -56,6 +56,7 @@ Dark "systems dashboard" aesthetic, consistent with the owner's existing portfol
 - JetBrains Mono for data, timestamps, and numeric fields
 - Space Grotesk for headings
 - Dense, information-first layouts — this is an ops tool, not a marketing site
+- Left sidebar nav (not a top bar) — collapses to a slide-in drawer on mobile via a hamburger toggle. Nav items that combine "my requests" with "approvals" (Leave, Corrections) render as a dropcard for admins/super admins (there are two places to go); staff only ever have one place to go, so they get a plain link instead of a pointless one-item menu.
 
 ## Working preferences
 

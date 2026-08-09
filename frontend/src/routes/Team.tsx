@@ -10,7 +10,7 @@ import {
   type Weekday,
 } from '../lib/api'
 import { DEMO_ADMIN_EMAIL } from '../lib/demo'
-import { Header } from '../components/Header'
+import { AppShell } from '../components/AppShell'
 import { StatusDot, formatStatusLabel, statusToVariant } from '../components/StatusDot'
 import { formatTimestamp } from '../lib/datetime'
 import { formatPeriodLabel, periodRange, shiftPeriod, type Granularity } from '../lib/period'
@@ -54,6 +54,22 @@ const ROLE_LABEL: Record<Role, string> = {
   staff: 'Staff',
   admin: 'Admin',
   super_admin: 'Super admin',
+}
+
+// Bordered pill, not a StatusDot color — roles aren't attendance status, and
+// reusing that dot language here would blur what the colored dots mean
+// elsewhere in the app. super_admin borrows the existing "good" accent
+// (already used for active-nav/you-are-here) to read as the elevated role,
+// rather than introducing a new hue.
+const ROLE_BADGE_CLASS: Record<Role, string> = {
+  staff: 'rounded-full border border-border px-2 py-0.5 text-xs text-text-muted',
+  admin: 'rounded-full border border-border px-2 py-0.5 text-xs text-text',
+  super_admin: 'rounded-full border border-status-good/40 bg-status-good/10 px-2 py-0.5 text-xs text-status-good',
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/)
+  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase()
 }
 
 export function Team() {
@@ -190,9 +206,7 @@ export function Team() {
   }
 
   return (
-    <div className="min-h-screen">
-      <Header profile={profile} />
-
+    <AppShell profile={profile}>
       <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
         <h1 className="mb-4 font-sans text-lg font-semibold text-text">Team</h1>
 
@@ -266,37 +280,63 @@ export function Team() {
         )}
 
         {profile.role === 'super_admin' && (
-          <section className="mb-8 rounded-lg border border-border bg-surface p-4 sm:p-6">
+          <section className="mb-8">
             <h2 className="mb-3 font-sans text-sm font-semibold uppercase tracking-wide text-text-muted">
               Team roles
             </h2>
             {roleError && <p className="mb-3 font-mono text-xs text-status-warning">{roleError}</p>}
-            <div className="flex flex-col gap-2">
-              {members.map((member) => {
-                const isSelf = member.id === profile.id
-                const lockedSuperAdmin = isSelf && member.role === 'super_admin'
-                return (
-                  <div key={member.id} className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-mono text-sm text-text">
-                      {member.name}
-                      {isSelf && <span className="text-text-muted"> (you)</span>}
-                    </span>
-                    <select
-                      value={member.role}
-                      onChange={(e) => handleRoleChange(member.id, e.target.value as Role)}
-                      disabled={roleUpdatingId === member.id || lockedSuperAdmin}
-                      title={lockedSuperAdmin ? "You can't remove your own super admin role" : undefined}
-                      className="rounded-md border border-border bg-bg px-2 py-1.5 font-mono text-xs text-text outline-none focus:border-status-good disabled:opacity-50"
-                    >
-                      {(Object.keys(ROLE_LABEL) as Role[]).map((role) => (
-                        <option key={role} value={role}>
-                          {ROLE_LABEL[role]}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )
-              })}
+            <div className="overflow-x-auto rounded-lg border border-border">
+              <table className="w-full border-collapse font-mono text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-text-muted">
+                    <th className="px-2 py-2 font-normal sm:px-4">Member</th>
+                    <th className="px-2 py-2 font-normal sm:px-4">Role</th>
+                    <th className="px-2 py-2 font-normal sm:px-4">Change role</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {members.map((member) => {
+                    const isSelf = member.id === profile.id
+                    const lockedSuperAdmin = isSelf && member.role === 'super_admin'
+                    return (
+                      <tr key={member.id} className="border-b border-border last:border-0">
+                        <td className="px-2 py-2 sm:px-4">
+                          <div className="flex items-center gap-3">
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-border/60 font-sans text-xs font-semibold text-text">
+                              {initials(member.name)}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="truncate text-text">
+                                {member.name}
+                                {isSelf && <span className="text-text-muted"> (you)</span>}
+                              </p>
+                              <p className="truncate text-xs text-text-muted">{member.email}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-2 py-2 sm:px-4">
+                          <span className={ROLE_BADGE_CLASS[member.role]}>{ROLE_LABEL[member.role]}</span>
+                        </td>
+                        <td className="px-2 py-2 sm:px-4">
+                          <select
+                            value={member.role}
+                            onChange={(e) => handleRoleChange(member.id, e.target.value as Role)}
+                            disabled={roleUpdatingId === member.id || lockedSuperAdmin}
+                            title={lockedSuperAdmin ? "You can't remove your own super admin role" : undefined}
+                            className="rounded-md border border-border bg-bg px-2 py-1.5 font-mono text-xs text-text outline-none focus:border-status-good disabled:opacity-50"
+                          >
+                            {(Object.keys(ROLE_LABEL) as Role[]).map((role) => (
+                              <option key={role} value={role}>
+                                {ROLE_LABEL[role]}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
           </section>
         )}
@@ -411,6 +451,6 @@ export function Team() {
           </div>
         </section>
       </main>
-    </div>
+    </AppShell>
   )
 }

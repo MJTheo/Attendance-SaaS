@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, type Correction, type UserProfile } from '../lib/api'
-import { Header } from '../components/Header'
+import { AppShell } from '../components/AppShell'
 import { CorrectionsList } from '../components/CorrectionsList'
 
 export function CorrectionRequests() {
@@ -39,9 +39,7 @@ export function CorrectionRequests() {
   const myCorrections = corrections.filter((c) => c.requested_by === profile.id)
 
   return (
-    <div className="min-h-screen">
-      <Header profile={profile} />
-
+    <AppShell profile={profile}>
       <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-8">
         <h1 className="mb-4 font-sans text-lg font-semibold text-text">Correction requests</h1>
 
@@ -52,6 +50,6 @@ export function CorrectionRequests() {
         </p>
         <CorrectionsList corrections={myCorrections} />
       </main>
-    </div>
+    </AppShell>
   )
 }

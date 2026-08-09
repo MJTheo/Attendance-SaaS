@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, type LeaveRequest, type UserProfile } from '../lib/api'
-import { Header } from '../components/Header'
+import { AppShell } from '../components/AppShell'
 import { LeaveRequestForm } from '../components/LeaveRequestForm'
 import { LeaveRequestsList } from '../components/LeaveRequestsList'
 
@@ -51,9 +51,7 @@ export function LeaveRequests() {
   const myLeaveRequests = leaveRequests.filter((l) => l.requested_by === profile.id)
 
   return (
-    <div className="min-h-screen">
-      <Header profile={profile} />
-
+    <AppShell profile={profile}>
       <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-8">
         <div className="mb-4 flex items-center justify-between">
           <h1 className="font-sans text-lg font-semibold text-text">Leave requests</h1>
@@ -76,6 +74,6 @@ export function LeaveRequests() {
         )}
         <LeaveRequestsList requests={myLeaveRequests} />
       </main>
-    </div>
+    </AppShell>
   )
 }

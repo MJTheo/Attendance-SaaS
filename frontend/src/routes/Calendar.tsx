@@ -10,7 +10,7 @@ import {
   type TeamDayDetail,
   type UserProfile,
 } from '../lib/api'
-import { Header } from '../components/Header'
+import { AppShell } from '../components/AppShell'
 import { Modal } from '../components/Modal'
 import { StatusDot, calendarStatusToVariant, formatStatusLabel, type DotVariant } from '../components/StatusDot'
 import { isoDate, monthGridCells } from '../lib/period'
@@ -325,9 +325,7 @@ export function Calendar() {
   }
 
   return (
-    <div className="min-h-screen">
-      <Header profile={profile} />
-
+    <AppShell profile={profile}>
       <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -407,6 +405,6 @@ export function Calendar() {
           )}
         </div>
       </main>
-    </div>
+    </AppShell>
   )
 }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { api, isAdmin, type Correction, type UserProfile } from '../lib/api'
-import { Header } from '../components/Header'
+import { AppShell } from '../components/AppShell'
 import { CorrectionsList } from '../components/CorrectionsList'
 
 export function CorrectionApprovals() {
@@ -64,9 +64,7 @@ export function CorrectionApprovals() {
   const resolvedCorrections = corrections.filter((c) => c.status !== 'pending')
 
   return (
-    <div className="min-h-screen">
-      <Header profile={profile} />
-
+    <AppShell profile={profile}>
       <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
         <h1 className="mb-4 font-sans text-lg font-semibold text-text">Correction approvals</h1>
 
@@ -98,6 +96,6 @@ export function CorrectionApprovals() {
           </section>
         )}
       </main>
-    </div>
+    </AppShell>
   )
 }

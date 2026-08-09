@@ -2,7 +2,7 @@ import { Fragment, useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiError, type AttendanceRecord, type CorrectionFields, type DayDetail, type UserProfile } from '../lib/api'
 import { StatusDot, formatStatusLabel, statusToVariant } from '../components/StatusDot'
-import { Header } from '../components/Header'
+import { AppShell } from '../components/AppShell'
 import { CorrectionRequestForm } from '../components/CorrectionRequestForm'
 import { formatTimestamp } from '../lib/datetime'
 import { Onboarding } from './Onboarding'
@@ -111,9 +111,7 @@ export function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen">
-      <Header profile={profile} />
-
+    <AppShell profile={profile}>
       <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-8">
         <section className="mb-8 rounded-lg border border-border bg-surface p-6 text-center sm:p-10">
           <div className="mb-2 flex justify-center">
@@ -234,6 +232,6 @@ export function Dashboard() {
           </div>
         </section>
       </main>
-    </div>
+    </AppShell>
   )
 }
