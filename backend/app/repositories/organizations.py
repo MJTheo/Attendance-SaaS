@@ -25,7 +25,7 @@ class OrganizationsRepository:
     def get(self, org_id: str) -> dict:
         response = (
             self._client.table("organizations")
-            .select("id, name, plan, working_days")
+            .select("id, name, plan, working_days, timezone")
             .eq("id", org_id)
             .limit(1)
             .execute()
@@ -33,12 +33,13 @@ class OrganizationsRepository:
         row = response.data[0]
         return {**row, "working_days": mask_to_days(row["working_days"])}
 
-    def update_working_days(self, org_id: str, working_days: list[int]) -> dict:
-        response = (
-            self._client.table("organizations")
-            .update({"working_days": days_to_mask(working_days)})
-            .eq("id", org_id)
-            .execute()
-        )
+    def update_settings(self, org_id: str, working_days: list[int] | None, timezone: str | None) -> dict:
+        patch: dict = {}
+        if working_days is not None:
+            patch["working_days"] = days_to_mask(working_days)
+        if timezone is not None:
+            patch["timezone"] = timezone
+
+        response = self._client.table("organizations").update(patch).eq("id", org_id).execute()
         row = response.data[0]
         return {**row, "working_days": mask_to_days(row["working_days"])}

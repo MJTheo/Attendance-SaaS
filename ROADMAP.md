@@ -50,16 +50,21 @@ run first (backfills old N values into the equivalent mask, preserving current b
 This unlocks #4 (holidays) and #7 (shift times), both of which need a correct "is this a working day"
 to build on.
 
-### Timezone handling
-*Not in your list — I noticed this while building the closeout job and want to flag it before more
-day-boundary logic gets built on top.* Every "what day is it" calculation (closeout job, streak,
-working-day checks, the calendar) currently assumes UTC midnight == the org's local midnight. That's
-wrong for any org outside UTC — the closeout job could flag someone `missed_clockout` mid-shift, or
-mark someone `absent` before their day has actually started locally. Doesn't block Phase 1 (single
-timezone, low volume), but #4 (holidays), #5 (overtime), #7 (shift times), and #8 (grace period) all
-get meaningfully harder to reason about correctly without deciding this first. Needs: an
-`organizations.timezone` column (IANA name, e.g. `Asia/Manila`) and rewriting day-boundary math to
-use it instead of naive UTC dates.
+### ~~Timezone handling~~ — done, drafted 2026-08-09
+*Not in your list — flagged while building the closeout job.* Every "what day is it" calculation now
+converts through `organizations.timezone` (IANA name, e.g. `Asia/Manila`, default `UTC`) instead of
+assuming UTC midnight == the org's local midnight: the once-per-day clock-in cap
+(`AttendanceService.clock_in`), streaks, the late-rate-by-weekday chart, the personal/team calendar
+and day-detail lookups, and the daily closeout job. `analytics_service.py`'s `_to_local_date`/
+`local_day_bounds` are the shared conversion points — every caller above them works with plain
+`date`/weekday values, same pattern as the working-days mask. The closeout job computes each org's
+target day independently as "now in that org's own timezone, minus one day," so correctness doesn't
+depend on when in UTC the cron fires or how far an org's offset is from it. Team.tsx's settings
+section grew a timezone `<select>` (populated from the browser's own `Intl.supportedValuesOf`) next
+to the working-days toggle row — both save independently now (`UpdateOrgSettings` fields are optional).
+**Written but not yet applied/live-tested** — needs migration `20260809120000_org_timezone.sql` run
+first. This unlocks #4 (holidays), #5 (overtime), #7 (shift times), and #8 (grace period), all of
+which get meaningfully harder to reason about correctly without a real notion of "today" to build on.
 
 ---
 

@@ -1,4 +1,5 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from supabase import Client
 
@@ -6,11 +7,13 @@ from app.repositories.attendance import AttendanceRepository
 from app.repositories.leave_requests import LeaveRequestsRepository
 from app.repositories.organizations import mask_to_days
 from app.repositories.users import UsersRepository
+from app.services.analytics_service import local_day_bounds
 
 
 def close_out_previous_day(service_client: Client) -> None:
-    """Runs daily on DAILY_CLOSEOUT_CRON, shortly after midnight UTC, to
-    finalize the calendar day that just ended for every org:
+    """Runs daily on DAILY_CLOSEOUT_CRON to finalize the calendar day that
+    just ended for every org, in that org's own timezone (organizations.timezone)
+    rather than UTC's:
 
       - any attendance record still open (no clock_out) from that day gets
         flagged 'missed_clockout' instead of looking like an ongoing shift
@@ -19,6 +22,16 @@ def close_out_previous_day(service_client: Client) -> None:
       - any org member with no attendance record and no approved leave
         covering that day gets an auto-created 'absent' record, but only on
         a day the org actually operates (per organizations.working_days).
+
+    Each org's target day is computed independently from "now in that org's
+    timezone minus one day" rather than the job's own (UTC) firing time —
+    that's what makes this correct regardless of when in UTC the cron fires
+    or how far the org's offset is from UTC: whatever calendar day just
+    ended locally for that org is always exactly one local-day-in-the-past
+    from its own current local time, full stop. The tradeoff is latency, not
+    correctness — an org's day is closed out within roughly 24h of ending
+    locally (bounded by the job's own daily cadence), same margin the
+    original UTC-only version had for UTC-based orgs.
 
     This updates attendance_records.status (and, for missed_clockout,
     clock_out) outside the corrections flow, which looks like it conflicts
@@ -37,17 +50,16 @@ def close_out_previous_day(service_client: Client) -> None:
     Service-role only, for the same reason as generate_weekly_reports: no
     authenticated caller to scope RLS to, and needs to iterate every org.
     """
-    target_day = (datetime.now(timezone.utc) - timedelta(days=1)).date()
-
-    orgs = service_client.table("organizations").select("id, working_days").execute().data
+    orgs = service_client.table("organizations").select("id, working_days, timezone").execute().data
     for org in orgs:
-        _close_out_org_day(service_client, org["id"], mask_to_days(org["working_days"]), target_day)
+        tz = ZoneInfo(org["timezone"])
+        target_day = (datetime.now(tz) - timedelta(days=1)).date()
+        _close_out_org_day(service_client, org["id"], mask_to_days(org["working_days"]), target_day, tz)
 
 
-def _close_out_org_day(service_client: Client, org_id: str, working_days: list[int], day: date) -> None:
+def _close_out_org_day(service_client: Client, org_id: str, working_days: list[int], day: date, tz: ZoneInfo) -> None:
     attendance = AttendanceRepository(service_client)
-    day_start = datetime.combine(day, datetime.min.time(), tzinfo=timezone.utc)
-    day_end = day_start + timedelta(days=1)
+    day_start, day_end = local_day_bounds(day, tz)
 
     org_records = attendance.list_for_org_range(day_start.isoformat(), day_end.isoformat(), org_id=org_id)
 

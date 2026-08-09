@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import Client
@@ -20,7 +20,9 @@ from app.services.analytics_service import (
     daily_trend,
     day_detail_for_org,
     late_rate_by_weekday,
+    local_day_bounds,
     month_bounds,
+    org_timezone,
     status_distribution,
     summarize_users,
 )
@@ -57,14 +59,18 @@ def team_analytics(
     admin: dict = Depends(require_admin),
 ):
     org = OrganizationsRepository(user_client).get(admin["org_id"])
+    tz = org_timezone(org)
     records = AttendanceRepository(user_client).list_for_org(2000)
 
     # Trend/distribution cover a trailing 30-day window rather than all-time,
     # so the payload stays bounded and the chart reads as "recent activity".
-    trend_end = date.today()
+    # "Today" is the org's own local date, not the server's.
+    trend_end = datetime.now(tz).date()
     trend_start = trend_end - timedelta(days=29)
+    range_start, _ = local_day_bounds(trend_start, tz)
+    _, range_end = local_day_bounds(trend_end, tz)
     trend_records = AttendanceRepository(user_client).list_for_org_range(
-        trend_start.isoformat(), (trend_end + timedelta(days=1)).isoformat()
+        range_start.isoformat(), range_end.isoformat()
     )
     approved_leave = LeaveRequestsRepository(user_client).list_approved_in_range(
         trend_start.isoformat(), trend_end.isoformat()
@@ -72,9 +78,9 @@ def team_analytics(
 
     return {
         "users": summarize_users(records),
-        "by_weekday": late_rate_by_weekday(records, org["working_days"]),
-        "distribution": status_distribution(trend_records, approved_leave, trend_start, trend_end),
-        "trend": daily_trend(trend_records, approved_leave, trend_start, trend_end),
+        "by_weekday": late_rate_by_weekday(records, org["working_days"], tz),
+        "distribution": status_distribution(trend_records, approved_leave, trend_start, trend_end, tz),
+        "trend": daily_trend(trend_records, approved_leave, trend_start, trend_end, tz),
     }
 
 
@@ -85,14 +91,16 @@ def team_calendar(
     user_client: Client = Depends(get_user_client),
     admin: dict = Depends(require_admin),
 ):
+    org = OrganizationsRepository(user_client).get(admin["org_id"])
+    tz = org_timezone(org)
     start, end = month_bounds(year, month)
-    records = AttendanceRepository(user_client).list_for_org_range(
-        start.isoformat(), (end + timedelta(days=1)).isoformat()
-    )
+    range_start, _ = local_day_bounds(start, tz)
+    _, range_end = local_day_bounds(end, tz)
+    records = AttendanceRepository(user_client).list_for_org_range(range_start.isoformat(), range_end.isoformat())
     approved_leave = LeaveRequestsRepository(user_client).list_approved_in_range(
         start.isoformat(), end.isoformat()
     )
-    return daily_trend(records, approved_leave, start, end)
+    return daily_trend(records, approved_leave, start, end, tz)
 
 
 @router.get("/calendar/{user_id}", response_model=list[CalendarDay])
@@ -103,15 +111,19 @@ def team_member_calendar(
     user_client: Client = Depends(get_user_client),
     admin: dict = Depends(require_admin),
 ):
+    org = OrganizationsRepository(user_client).get(admin["org_id"])
+    tz = org_timezone(org)
     start, end = month_bounds(year, month)
+    range_start, _ = local_day_bounds(start, tz)
+    _, range_end = local_day_bounds(end, tz)
     records = AttendanceRepository(user_client).list_for_user_range(
-        user_id, start.isoformat(), (end + timedelta(days=1)).isoformat()
+        user_id, range_start.isoformat(), range_end.isoformat()
     )
     approved_leave = LeaveRequestsRepository(user_client).list_approved_in_range(
         start.isoformat(), end.isoformat()
     )
     return build_personal_calendar(
-        records, [leave for leave in approved_leave if leave["user_id"] == user_id], start, end
+        records, [leave for leave in approved_leave if leave["user_id"] == user_id], start, end, tz
     )
 
 
@@ -121,10 +133,13 @@ def team_day(
     user_client: Client = Depends(get_user_client),
     admin: dict = Depends(require_admin),
 ):
-    records = AttendanceRepository(user_client).list_for_org_range(day.isoformat(), (day + timedelta(days=1)).isoformat())
+    org = OrganizationsRepository(user_client).get(admin["org_id"])
+    tz = org_timezone(org)
+    range_start, range_end = local_day_bounds(day, tz)
+    records = AttendanceRepository(user_client).list_for_org_range(range_start.isoformat(), range_end.isoformat())
     approved_leave = LeaveRequestsRepository(user_client).list_approved_in_range(day.isoformat(), day.isoformat())
     users = UsersRepository(user_client).list_for_org()
-    return day_detail_for_org(records, approved_leave, users, day)
+    return day_detail_for_org(records, approved_leave, users, day, tz)
 
 
 @router.get("/users", response_model=list[UserProfile])
@@ -164,7 +179,7 @@ def update_org_settings(
     user_client: Client = Depends(get_user_client),
     admin: dict = Depends(require_admin),
 ):
-    return OrganizationsRepository(user_client).update_working_days(admin["org_id"], payload.working_days)
+    return OrganizationsRepository(user_client).update_settings(admin["org_id"], payload.working_days, payload.timezone)
 
 
 @router.get("/reports", response_model=list[Report])

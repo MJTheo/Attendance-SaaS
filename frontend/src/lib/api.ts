@@ -170,6 +170,7 @@ export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6
 
 export interface OrgSettings {
   working_days: Weekday[]
+  timezone: string
 }
 
 export interface Correction {
@@ -223,10 +224,10 @@ export const api = {
   analytics: () => apiFetch<TeamAnalytics>('/admin/analytics'),
   reports: () => apiFetch<Report[]>('/admin/reports'),
   orgSettings: () => apiFetch<OrgSettings>('/admin/settings'),
-  updateOrgSettings: (workingDays: Weekday[]) =>
+  updateOrgSettings: (patch: { working_days?: Weekday[]; timezone?: string }) =>
     apiFetch<OrgSettings>('/admin/settings', {
       method: 'PATCH',
-      body: JSON.stringify({ working_days: workingDays }),
+      body: JSON.stringify(patch),
     }),
   requestLeave: (leaveType: 'sick' | 'annual', startDate: string, endDate: string, reason: string) =>
     apiFetch<LeaveRequest>('/leave', {

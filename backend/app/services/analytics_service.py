@@ -1,6 +1,7 @@
 from calendar import monthrange
 from collections import defaultdict
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
@@ -9,27 +10,51 @@ LEAVE_STATUS_KEYS = ["sick_leave", "annual_leave"]
 ALL_STATUS_KEYS = ATTENDANCE_STATUS_KEYS + LEAVE_STATUS_KEYS
 
 
+def org_timezone(org: dict) -> ZoneInfo:
+    return ZoneInfo(org["timezone"])
+
+
+def local_day_bounds(day: date, tz: ZoneInfo) -> tuple[datetime, datetime]:
+    """[start, end) for one calendar day in the org's own timezone, as
+    timezone-aware datetimes — the boundary to query attendance_records
+    against, since "today" for an org is defined by its own clock, not
+    UTC's or the server's."""
+    start = datetime.combine(day, datetime.min.time(), tzinfo=tz)
+    return start, start + timedelta(days=1)
+
+
 def _to_date(value: str | datetime) -> date:
+    """For date-only values (leave_requests.start_date/end_date) — no
+    timezone conversion applies, there's no time component to convert."""
     if isinstance(value, datetime):
         return value.date()
     return datetime.fromisoformat(value).date()
 
 
-def compute_streak(records: list[dict], working_days: set[int] | list[int] = (0, 1, 2, 3, 4)) -> int:
-    """Consecutive most-recent calendar days with at least one non-absent
-    record, no gaps. Grounded only in records that actually exist — there's
-    no shift-schedule concept yet (see AttendanceService._determine_clock_in_status),
-    so a day with no record at all isn't assumed to be a missed workday,
-    with one narrow exception: non-working days (per the org's working_days —
-    a set of weekday indices, Monday=0..Sunday=6) are skipped when checking
-    for a gap rather than treated as a missed day, since assuming *every* day
-    is a workday is itself an unstated schedule assumption — and the wrong
-    one for orgs that don't run every weekday."""
+def _to_local_date(value: str | datetime, tz: ZoneInfo) -> date:
+    """For timestamptz values (attendance_records.clock_in) — which
+    calendar day a moment falls on depends on the org's timezone, not the
+    UTC offset the timestamp happens to be stored/returned in."""
+    parsed = value if isinstance(value, datetime) else datetime.fromisoformat(value)
+    return parsed.astimezone(tz).date()
+
+
+def compute_streak(records: list[dict], working_days: set[int] | list[int], tz: ZoneInfo) -> int:
+    """Consecutive most-recent calendar days (in the org's own timezone)
+    with at least one non-absent record, no gaps. Grounded only in records
+    that actually exist — there's no shift-schedule concept yet (see
+    AttendanceService._determine_clock_in_status), so a day with no record
+    at all isn't assumed to be a missed workday, with one narrow exception:
+    non-working days (per the org's working_days — a set of weekday
+    indices, Monday=0..Sunday=6) are skipped when checking for a gap rather
+    than treated as a missed day, since assuming *every* day is a workday
+    is itself an unstated schedule assumption — and the wrong one for orgs
+    that don't run every weekday."""
     working_days = set(working_days)
     dates_seen: set[date] = set()
     attended_dates: set[date] = set()
     for record in records:
-        day = _to_date(record["clock_in"])
+        day = _to_local_date(record["clock_in"], tz)
         dates_seen.add(day)
         if record["status"] != "absent":
             attended_dates.add(day)
@@ -78,14 +103,14 @@ def summarize_users(team_records: list[dict]) -> list[dict]:
     return summaries
 
 
-def late_rate_by_weekday(team_records: list[dict], working_days: set[int] | list[int] = (0, 1, 2, 3, 4)) -> list[dict]:
+def late_rate_by_weekday(team_records: list[dict], working_days: set[int] | list[int], tz: ZoneInfo) -> list[dict]:
     """Breakdown for the org's working weekday indices (Monday=0..Sunday=6)
     only — non-working days are dropped rather than rendered as an
     always-empty row."""
     totals: dict[int, int] = defaultdict(int)
     late: dict[int, int] = defaultdict(int)
     for record in team_records:
-        weekday = _to_date(record["clock_in"]).weekday()
+        weekday = _to_local_date(record["clock_in"], tz).weekday()
         totals[weekday] += 1
         if record["status"] == "late":
             late[weekday] += 1
@@ -127,13 +152,13 @@ def _expand_leave_days(leave_requests: list[dict], start: date, end: date) -> di
     return counts
 
 
-def daily_trend(records: list[dict], leave_requests: list[dict], start: date, end: date) -> list[dict]:
+def daily_trend(records: list[dict], leave_requests: list[dict], start: date, end: date, tz: ZoneInfo) -> list[dict]:
     """One entry per calendar day in [start, end] with counts for every
     status (attendance + leave). Used both for the analytics trend chart and
     as the team calendar's per-day data — same shape serves both."""
     per_day_attendance: dict[date, dict[str, int]] = defaultdict(lambda: {k: 0 for k in ATTENDANCE_STATUS_KEYS})
     for record in records:
-        day = _to_date(record["clock_in"])
+        day = _to_local_date(record["clock_in"], tz)
         if start <= day <= end:
             per_day_attendance[day][record["status"]] = per_day_attendance[day].get(record["status"], 0) + 1
 
@@ -149,13 +174,13 @@ def daily_trend(records: list[dict], leave_requests: list[dict], start: date, en
     return out
 
 
-def status_distribution(records: list[dict], leave_requests: list[dict], start: date, end: date) -> dict:
+def status_distribution(records: list[dict], leave_requests: list[dict], start: date, end: date, tz: ZoneInfo) -> dict:
     """Total count per status across [start, end] — org totals attendance
     + leave for the same window daily_trend covers, just summed instead of
     broken out by day."""
     totals = {k: 0 for k in ALL_STATUS_KEYS}
     for record in records:
-        day = _to_date(record["clock_in"])
+        day = _to_local_date(record["clock_in"], tz)
         if start <= day <= end:
             totals[record["status"]] = totals.get(record["status"], 0) + 1
     for day_counts in _expand_leave_days(leave_requests, start, end).values():
@@ -164,14 +189,16 @@ def status_distribution(records: list[dict], leave_requests: list[dict], start: 
     return totals
 
 
-def build_personal_calendar(records: list[dict], leave_requests: list[dict], start: date, end: date) -> list[dict]:
+def build_personal_calendar(
+    records: list[dict], leave_requests: list[dict], start: date, end: date, tz: ZoneInfo
+) -> list[dict]:
     """One entry per calendar day in [start, end] with a single status (or
     null if nothing happened that day). Approved leave overrides an
     attendance-derived status for the same day — an approved leave day is
     the more authoritative statement of what that day was."""
     status_by_day: dict[date, str] = {}
     for record in records:
-        day = _to_date(record["clock_in"])
+        day = _to_local_date(record["clock_in"], tz)
         if start <= day <= end:
             status_by_day[day] = record["status"]
 
@@ -183,7 +210,7 @@ def build_personal_calendar(records: list[dict], leave_requests: list[dict], sta
     return [{"date": day.isoformat(), "status": status_by_day.get(day)} for day in _date_range(start, end)]
 
 
-def day_detail_for_user(records: list[dict], leave_requests: list[dict], user_id: str, day: date) -> dict:
+def day_detail_for_user(records: list[dict], leave_requests: list[dict], user_id: str, day: date, tz: ZoneInfo) -> dict:
     """Full detail (not just a status label) for one user on one day — backs
     the calendar's click-to-view popup. leave_requests is expected already
     filtered to this user's approved requests."""
@@ -202,7 +229,7 @@ def day_detail_for_user(records: list[dict], leave_requests: list[dict], user_id
             }
 
     record = next(
-        (r for r in records if r["user_id"] == user_id and _to_date(r["clock_in"]) == day),
+        (r for r in records if r["user_id"] == user_id and _to_local_date(r["clock_in"], tz) == day),
         None,
     )
     if record:
@@ -227,8 +254,14 @@ def day_detail_for_user(records: list[dict], leave_requests: list[dict], user_id
     }
 
 
-def day_detail_for_org(records: list[dict], leave_requests: list[dict], users: list[dict], day: date) -> list[dict]:
+def day_detail_for_org(
+    records: list[dict], leave_requests: list[dict], users: list[dict], day: date, tz: ZoneInfo
+) -> list[dict]:
     return [
-        {"user_id": user["id"], "name": user["name"], **day_detail_for_user(records, leave_requests, user["id"], day)}
+        {
+            "user_id": user["id"],
+            "name": user["name"],
+            **day_detail_for_user(records, leave_requests, user["id"], day, tz),
+        }
         for user in users
     ]

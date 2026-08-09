@@ -29,7 +29,7 @@ The non-negotiable rules this project was built around:
 
 ### Data model
 
-- `organizations` — id, name, plan, created_at, working_days (bitmask of the weekdays this org operates, Monday=0..Sunday=6 — any subset, e.g. Tue-Sat, not just "the first N days")
+- `organizations` — id, name, plan, created_at, working_days (bitmask of the weekdays this org operates, Monday=0..Sunday=6 — any subset, e.g. Tue-Sat, not just "the first N days"), timezone (IANA name, e.g. `Asia/Manila`)
 - `users` — id (= `auth.users.id`), org_id, role (`admin` / `staff` / `super_admin`), name, email
 - `attendance_records` — id, org_id, user_id, clock_in, clock_out, status, notes
 - `corrections` — id, attendance_record_id, org_id, requested_by, approved_by, reason, old_value, new_value, status, created_at, resolved_at
@@ -46,6 +46,7 @@ The non-negotiable rules this project was built around:
 - **Analytics trend/distribution cover a trailing 30-day window**, not all-time, so the payload stays bounded regardless of how long an org has been running.
 - **`super_admin` is a distinct role value, not a flag on top of `admin`**, and `app.is_admin()` treats it as a superset — a super admin passes every existing admin check without duplicating policies. Role changes are gated by a dedicated `app.is_super_admin()` check and a DB trigger (`users_role_change_guard`), not RLS alone, because RLS is row-level and can't stop an admin from rewriting just the `role` column on an otherwise-permitted update. An org can have any number of super admins, and the trigger blocks a super admin from removing their own super_admin role — the one thing worth hard-blocking, since it's the only way an org could lock itself out of ever promoting anyone again.
 - **`organizations.working_days` is stored as a 7-bit mask, not an int count.** The original "5/6/7 = the first N weekdays" design couldn't express a Tue–Sat schedule. The mask only exists at the storage boundary (`repositories/organizations.py`'s `mask_to_days`/`days_to_mask`) — every consumer (streak calculation, the late-rate-by-weekday chart, the daily closeout job's non-working-day check, the settings UI) works with a plain list of weekday indices.
+- **Every "what day is it" calculation is scoped to the org's own timezone (`organizations.timezone`), not UTC or the server's clock.** The once-per-day clock-in cap, streaks, the daily closeout job's target day, and every calendar/analytics day-bucketing function all convert through it (`analytics_service.py`'s `_to_local_date`/`local_day_bounds`). This matters most for the closeout job: without it, an org meaningfully outside UTC could get flagged `missed_clockout` mid-shift or marked `absent` before its day had actually started locally. The closeout job computes each org's target day independently as "now in that org's timezone, minus one day," so correctness doesn't depend on when in UTC the cron happens to fire.
 
 ## Local development
 

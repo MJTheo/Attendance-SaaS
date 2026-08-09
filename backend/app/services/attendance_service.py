@@ -1,6 +1,8 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from app.repositories.attendance import AttendanceRepository
+from app.services.analytics_service import local_day_bounds
 
 
 class AlreadyClockedInError(Exception):
@@ -30,13 +32,16 @@ class AttendanceService:
     def __init__(self, repo: AttendanceRepository):
         self._repo = repo
 
-    def clock_in(self, org_id: str, user_id: str) -> dict:
+    def clock_in(self, org_id: str, user_id: str, tz: ZoneInfo) -> dict:
         if self._repo.get_open_record(user_id) is not None:
             raise AlreadyClockedInError()
 
         now = datetime.now(timezone.utc)
-        today_start = datetime.combine(now.date(), datetime.min.time(), tzinfo=timezone.utc)
-        tomorrow_start = today_start + timedelta(days=1)
+        # "Today" is the org's local calendar day (tz), not the UTC day —
+        # otherwise someone clocking in near UTC midnight in a non-UTC org
+        # could be wrongly allowed a second clock-in for what's still the
+        # same local day, or wrongly blocked from a new local day.
+        today_start, tomorrow_start = local_day_bounds(now.astimezone(tz).date(), tz)
         # Capped at one clock-in per day, not just "no currently-open record" —
         # otherwise clocking out and then accidentally tapping "Clock in"
         # again minutes later would silently open a second record for today.

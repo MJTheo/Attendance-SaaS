@@ -24,7 +24,7 @@ These are non-negotiable — flag it rather than working around them:
 
 ## Data model
 
-- `organizations` — id, name, plan, created_at, working_days (bitmask of the weekdays this org operates, Monday=0..Sunday=6 — an arbitrary subset, not just "the first N days")
+- `organizations` — id, name, plan, created_at, working_days (bitmask of the weekdays this org operates, Monday=0..Sunday=6 — an arbitrary subset, not just "the first N days"), timezone (IANA name, e.g. `Asia/Manila` — defines "today" for the closeout job, the once-per-day clock cap, streaks, and the calendar; not the viewer's own device timezone)
 - `users` — id, org_id (FK), role (admin/staff/super_admin), name, email
 - `attendance_records` — id, org_id, user_id, clock_in, clock_out, status, notes
 - `corrections` — id, attendance_record_id, requested_by, approved_by, reason, old_value, new_value, status, created_at

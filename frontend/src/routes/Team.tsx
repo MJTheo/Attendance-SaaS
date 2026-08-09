@@ -32,6 +32,24 @@ function describeWorkingDays(days: number[]): string {
     .join(', ')
 }
 
+// IANA zone names, from the browser itself — avoids shipping/maintaining a
+// static list. Falls back to a small curated set on older browsers without
+// Intl.supportedValuesOf (Safari < 17, e.g.).
+const TIMEZONES: string[] =
+  typeof Intl.supportedValuesOf === 'function'
+    ? Intl.supportedValuesOf('timeZone')
+    : [
+        'UTC',
+        'America/New_York',
+        'America/Los_Angeles',
+        'Europe/London',
+        'Europe/Berlin',
+        'Asia/Manila',
+        'Asia/Tokyo',
+        'Asia/Kolkata',
+        'Australia/Sydney',
+      ]
+
 const ROLE_LABEL: Record<Role, string> = {
   staff: 'Staff',
   admin: 'Admin',
@@ -118,7 +136,20 @@ export function Team() {
     setError(null)
     setSavingSettings(true)
     try {
-      const updated = await api.updateOrgSettings(workingDays)
+      const updated = await api.updateOrgSettings({ working_days: workingDays })
+      setOrgSettings(updated)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update settings')
+    } finally {
+      setSavingSettings(false)
+    }
+  }
+
+  async function handleTimezoneChange(timezone: string) {
+    setError(null)
+    setSavingSettings(true)
+    try {
+      const updated = await api.updateOrgSettings({ timezone })
       setOrgSettings(updated)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update settings')
@@ -203,6 +234,33 @@ export function Team() {
             )}
             <p className="mt-2 font-mono text-xs text-text-muted">
               Controls which weekdays show up in analytics and which days count toward streaks.
+            </p>
+
+            <span className="mb-1 mt-4 block font-mono text-xs uppercase tracking-wide text-text-muted">
+              Timezone
+            </span>
+            {profile.email !== DEMO_ADMIN_EMAIL ? (
+              <select
+                value={orgSettings.timezone}
+                onChange={(e) => handleTimezoneChange(e.target.value)}
+                disabled={savingSettings}
+                className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-status-good disabled:opacity-50 sm:w-auto"
+              >
+                {!TIMEZONES.includes(orgSettings.timezone) && (
+                  <option value={orgSettings.timezone}>{orgSettings.timezone}</option>
+                )}
+                {TIMEZONES.map((tz) => (
+                  <option key={tz} value={tz}>
+                    {tz}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <p className="font-mono text-sm text-text">{orgSettings.timezone}</p>
+            )}
+            <p className="mt-2 font-mono text-xs text-text-muted">
+              Defines what "today" means for clock-in caps, streaks, and the daily closeout job — not
+              each viewer's own device timezone.
             </p>
           </section>
         )}
