@@ -99,8 +99,12 @@ async function staff(browser) {
       (await s.page.locator('aside button:has-text("Sign out")').count()) === 1)
   await s.page.click('aside a:has-text("My profile")')
   await s.page.waitForSelector('h1:has-text("My profile")')
+  await s.page.waitForFunction(() => !document.body.innerText.includes('Loading…'), null, { timeout: 10000 })
+  // innerText follows CSS text-transform, so section headings come back uppercase.
   const profileText = await s.page.locator('main').innerText()
-  check('staff', 'My profile shows details and history', /Request a change/.test(profileText) && /My change requests/.test(profileText))
+  // live_api.py files name changes for this account, so the history must list them.
+  check('staff', 'My profile shows details and request history',
+    /request a change/i.test(profileText) && /Name: .+ → /.test(profileText))
   await shot(s, 'staff-profile')
   await visit(s, '/calendar', 'Calendar')
   check('staff', 'Calendar has no team view', (await s.page.locator('main button', { hasText: /^Team$/ }).count()) === 0)
@@ -134,7 +138,7 @@ async function admin(browser) {
   await shot(s, 'admin-company')
   await visit(s, '/team', 'Team')
   check('admin', 'Team: roles table hidden', (await s.page.locator('text=Team roles').count()) === 0)
-  check('admin', 'Team: profile change queue shown', (await s.page.locator('text=Profile change requests').count()) === 1)
+  check('admin', 'Team: profile change queue shown', (await s.page.locator('h2:has-text("Profile change requests")').count()) === 1)
   check('admin', 'Team: no org settings left on this page', (await s.page.locator('text=Organization settings').count()) === 0)
   await visit(s, '/')
   for (const [label, heading] of [['Leave', 'Leave approvals'], ['Corrections', 'Correction approvals']]) {
