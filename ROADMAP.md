@@ -214,7 +214,9 @@ discussion: single office location, or multiple? Remote/hybrid staff exemption?
 - **Automated tests — started, still thin.** A pytest suite now exists (`backend/tests`,
   `requirements-dev.txt`; runs with no Supabase, repositories faked via `monkeypatch` +
   FastAPI `dependency_overrides`). It covers org schemas, the working-days mask, and the
-  Company page routes' role gating. Still missing, and the most valuable next: `analytics_service.py`
+  Company page routes' role gating. A live end-to-end suite (`e2e/`) now also runs against
+  production as a super admin, admin and staff member in a dedicated test org — role gating, the
+  DB triggers/RLS hit directly, corrections, leave, timezone, and tenant isolation. Still missing, and the most valuable next: `analytics_service.py`
   (streaks, timezone day-bucketing) and the closeout job — two real bugs shipped there before
   (auto-`absent` records blocking future clock-ins, twice) and grace periods/overtime/holidays will
   add more day-boundary logic on top.

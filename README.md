@@ -77,6 +77,9 @@ pip install -r requirements-dev.txt
 python -m pytest
 ```
 
+Live end-to-end checks against the deployed app (real accounts in a dedicated
+test org; writes to production) live in [`e2e/`](e2e/README.md).
+
 ## Build phases
 
 1. **Foundation** — org sign-up, auth, core clock in/out

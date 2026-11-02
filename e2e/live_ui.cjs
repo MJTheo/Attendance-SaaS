@@ -1,0 +1,199 @@
+// Live end-to-end UI suite against a deployed Landas Time.
+//
+// Signs in through the real sign-in form as the test org's staff, admin and
+// super admin (E2E_* env vars) and checks what each role can see and do, plus
+// a read-only pass through the public "View live demo" login.
+//
+// Writes to production: one rename of the test org, immediately reverted.
+// Run e2e/live_api.py first so there's request data to look at.
+// Screenshots go to e2e/output/ (gitignored).
+//
+// Usage: cd e2e && npm install && npx playwright install chromium && node live_ui.cjs
+
+const fs = require('fs')
+const path = require('path')
+const { chromium } = require('playwright')
+
+const BASE = (process.env.E2E_BASE_URL || 'https://attendance-saa-s.vercel.app').replace(/\/$/, '')
+const OUT = path.join(__dirname, 'output')
+const results = []
+
+function check(area, name, ok, detail = '') {
+  results.push({ area, name, ok: Boolean(ok) })
+  console.log(`${ok ? 'PASS' : 'FAIL'} [${area}] ${name}${detail ? '  — ' + detail : ''}`)
+}
+
+for (const role of ['SUPERADMIN', 'ADMIN', 'STAFF']) {
+  for (const part of ['EMAIL', 'PASSWORD']) {
+    if (!process.env[`E2E_${role}_${part}`]) {
+      console.error(`Missing E2E_${role}_${part} — see e2e/README.md`)
+      process.exit(1)
+    }
+  }
+}
+
+async function open(browser, viewport = { width: 1280, height: 900 }) {
+  const context = await browser.newContext({ viewport, colorScheme: 'dark' })
+  const page = await context.newPage()
+  const errors = { api: [], page: [] }
+  page.on('response', (r) => {
+    const url = new URL(r.url())
+    if (url.origin !== BASE && !/supabase\.co$/.test(url.hostname) && r.status() >= 400) {
+      errors.api.push(`${r.status()} ${r.request().method()} ${url.pathname}`)
+    }
+  })
+  page.on('pageerror', (e) => errors.page.push(e.message))
+  return { context, page, errors }
+}
+
+async function signIn(browser, role, viewport) {
+  const s = await open(browser, viewport)
+  await s.page.goto(`${BASE}/signin`)
+  await s.page.fill('input[type=email]', process.env[`E2E_${role}_EMAIL`])
+  await s.page.fill('input[type=password]', process.env[`E2E_${role}_PASSWORD`])
+  await s.page.click('button[type=submit]')
+  await s.page.waitForSelector('aside nav', { timeout: 20000 })
+  return s
+}
+
+// Each page shows a full-screen "Loading…" until its data arrives, so wait for
+// the page's own heading (when it has one) and for any loading text to clear.
+async function visit(s, route, heading) {
+  s.errors.api.length = 0
+  s.errors.page.length = 0
+  await s.page.goto(BASE + route)
+  if (heading) await s.page.waitForSelector(`h1:has-text("${heading}")`, { timeout: 15000 }).catch(() => {})
+  await s.page.waitForLoadState('networkidle')
+  await s.page
+    .waitForFunction(() => !document.body.innerText.includes('Loading…'), null, { timeout: 10000 })
+    .catch(() => {})
+  return { path: new URL(s.page.url()).pathname, problems: [...s.errors.api, ...s.errors.page] }
+}
+
+async function shot(s, name) {
+  await s.page.screenshot({ path: path.join(OUT, `${name}.png`), fullPage: true })
+}
+
+async function staff(browser) {
+  const s = await signIn(browser, 'STAFF')
+  await visit(s, '/')
+  const links = (await s.page.locator('aside nav a').allInnerTexts()).map((t) => t.trim())
+  check('staff', 'Nav is four plain links, no dropcards',
+    JSON.stringify(links) === JSON.stringify(['Dashboard', 'Calendar', 'Leave', 'Corrections']) &&
+      (await s.page.locator('aside nav button').count()) === 0, links.join(', '))
+  check('staff', 'Dashboard shows the clock card and streak', /Streak:/.test(await s.page.locator('main').innerText()))
+  await shot(s, 'staff-dashboard')
+  for (const route of ['/team', '/analytics', '/company', '/approvals/leave', '/approvals/corrections']) {
+    const v = await visit(s, route)
+    check('staff', `${route} redirects to the dashboard`, v.path === '/', v.path)
+  }
+  for (const [route, heading] of [['/calendar', 'Calendar'], ['/requests/leave', 'Leave requests'],
+                                  ['/requests/corrections', 'Correction requests']]) {
+    const v = await visit(s, route, heading)
+    check('staff', `${route} loads cleanly`, v.path === route && !v.problems.length, v.problems.join('; '))
+  }
+  await visit(s, '/calendar', 'Calendar')
+  check('staff', 'Calendar has no team view', (await s.page.locator('main button', { hasText: /^Team$/ }).count()) === 0)
+  await s.context.close()
+
+  const m = await signIn(browser, 'STAFF', { width: 390, height: 844 })
+  await visit(m, '/')
+  await m.page.click('[aria-label="Open navigation menu"]')
+  await m.page.waitForTimeout(400)
+  check('staff', 'Mobile drawer opens', (await m.page.locator('aside').boundingBox()).x >= 0)
+  await m.page.click('aside nav a:has-text("Calendar")')
+  await m.page.waitForTimeout(400)
+  check('staff', 'Mobile drawer closes after navigating', (await m.page.locator('aside').boundingBox()).x < 0)
+  check('staff', 'No horizontal scroll on mobile',
+    !(await m.page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)))
+  await m.context.close()
+}
+
+async function admin(browser) {
+  const s = await signIn(browser, 'ADMIN')
+  for (const [route, heading] of [['/', null], ['/calendar', 'Calendar'], ['/requests/leave', 'Leave requests'],
+                                  ['/approvals/leave', 'Leave approvals'], ['/requests/corrections', 'Correction requests'],
+                                  ['/approvals/corrections', 'Correction approvals'], ['/team', 'Team'],
+                                  ['/analytics', 'Analytics'], ['/company', 'Company']]) {
+    const v = await visit(s, route, heading)
+    check('admin', `${route} loads cleanly`, v.path === route && !v.problems.length, v.problems.join('; '))
+  }
+  await visit(s, '/company', 'Company')
+  check('admin', 'Company: no Rename button', (await s.page.locator('button', { hasText: 'Rename' }).count()) === 0)
+  check('admin', 'Company: working days editable', (await s.page.locator('button[title="Monday"]').count()) === 1)
+  await shot(s, 'admin-company')
+  await visit(s, '/team', 'Team')
+  check('admin', 'Team: roles table hidden', (await s.page.locator('text=Team roles').count()) === 0)
+  check('admin', 'Team: no org settings left on this page', (await s.page.locator('text=Organization settings').count()) === 0)
+  await visit(s, '/')
+  for (const [label, heading] of [['Leave', 'Leave approvals'], ['Corrections', 'Correction approvals']]) {
+    await s.page.click(`aside nav button:has-text("${label}")`)
+    await s.page.click('aside nav a:has-text("Approvals")')
+    await s.page.waitForSelector(`h1:has-text("${heading}")`)
+    const cls = await s.page.locator(`aside nav button:has-text("${label}")`).getAttribute('class')
+    check('admin', `${label} dropcard navigates and stays highlighted`, /text-status-good/.test(cls || ''))
+  }
+  const before = await s.page.evaluate(() => document.documentElement.getAttribute('data-theme'))
+  await s.page.locator('aside button[title^="Switch to"]').first().click()
+  const after = await s.page.evaluate(() => document.documentElement.getAttribute('data-theme'))
+  check('admin', 'Theme toggle switches theme', before !== after, `${before} -> ${after}`)
+  await s.page.locator('aside button[title^="Switch to"]').first().click()
+  await s.context.close()
+}
+
+async function superAdmin(browser) {
+  const s = await signIn(browser, 'SUPERADMIN')
+  await visit(s, '/company', 'Company')
+  const name = (await s.page.locator('main section').first().locator('p').first().innerText()).trim()
+  check('super', 'Company: Rename button shown', (await s.page.locator('button', { hasText: 'Rename' }).count()) === 1)
+  await s.page.click('button:has-text("Rename")')
+  await s.page.fill('main form input', `${name} (renamed)`)
+  await s.page.click('button:has-text("Save")')
+  await s.page.waitForSelector(`text=${name} (renamed)`)
+  await s.page.click('button:has-text("Rename")')
+  await s.page.fill('main form input', name)
+  await s.page.click('button:has-text("Save")')
+  await s.page.waitForFunction((n) => !document.querySelector('main form') && document.body.innerText.includes(n), name)
+  check('super', 'Rename through the UI and back', true, name)
+  await shot(s, 'super-company')
+  await visit(s, '/team', 'Team')
+  const rows = await s.page.locator('section:has-text("Team roles") tbody tr').count()
+  check('super', 'Team roles table lists the members', rows >= 3, `${rows} rows`)
+  const own = s.page.locator('section:has-text("Team roles") tbody tr', { hasText: '(you)' }).locator('select')
+  check('super', 'Own role selector is locked', (await own.count()) === 0 || (await own.isDisabled()))
+  await shot(s, 'super-team')
+  const v = await visit(s, '/analytics', 'Analytics')
+  check('super', 'Analytics loads cleanly', !v.problems.length, v.problems.join('; '))
+  await shot(s, 'super-analytics')
+  await s.context.close()
+}
+
+async function publicDemo(browser) {
+  const s = await open(browser)
+  await s.page.goto(`${BASE}/signin`)
+  await s.page.click('text=View live demo')
+  await s.page.waitForSelector('aside nav', { timeout: 20000 })
+  const v = await visit(s, '/company', 'Company')
+  const text = await s.page.locator('main').innerText()
+  check('demo', 'Public demo login reaches the app', v.path === '/company' && !v.problems.length, v.problems.join('; '))
+  check('demo', 'Demo org is read-only for rename and settings',
+    /demo/.test(text) && (await s.page.locator('button', { hasText: 'Rename' }).count()) === 0 &&
+      (await s.page.locator('button[title="Monday"]').count()) === 0)
+  await s.context.close()
+}
+
+;(async () => {
+  fs.mkdirSync(OUT, { recursive: true })
+  const browser = await chromium.launch()
+  for (const [area, fn] of [['staff', staff], ['admin', admin], ['super', superAdmin], ['demo', publicDemo]]) {
+    try {
+      await fn(browser)
+    } catch (e) {
+      check(area, 'section crashed', false, e.message.split('\n')[0])
+    }
+  }
+  await browser.close()
+  const failed = results.filter((r) => !r.ok).length
+  console.log(`\n${results.length} checks, ${results.length - failed} passed, ${failed} failed`)
+  process.exit(failed ? 1 : 0)
+})()

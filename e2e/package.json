@@ -1,0 +1,12 @@
+{
+  "name": "landas-time-e2e",
+  "private": true,
+  "description": "Live end-to-end checks against a deployed Landas Time — see README.md",
+  "scripts": {
+    "api": "python3 live_api.py",
+    "ui": "node live_ui.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}
