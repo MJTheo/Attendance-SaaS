@@ -2,18 +2,32 @@
 
 ## Where things stand
 
-**v0.1.1-alpha — Build Phase 1**, shipped 2026-08-08. Live at https://attendance-saa-s.vercel.app.
+**Build Phase 2 in progress** — last updated 2026-11-02. Live at https://attendance-saa-s.vercel.app.
 
-Everything from the original 4-phase plan (foundation, corrections + admin dashboard, analytics,
-polish) plus a full extra round of work done after that: sick/annual leave requests with their own
-audit-trailed approval workflow, a personal + team calendar (with per-day, per-person click-through
-detail), analytics trend/distribution/weekday charts, dedicated Approvals (admin) and Requests
-(everyone) pages split off Team/Dashboard, active-nav highlighting, a bigger clock-in/out hero, a
-once-per-day clock-in cap, and a daily job that auto-flags `missed_clockout` and auto-creates
-`absent` records.
+- **Build Phase 1 (v0.1.1-alpha, 2026-08-08):** the original 4-phase plan (foundation, corrections +
+  admin dashboard, analytics, polish) plus an extra round: sick/annual leave with its own approval
+  workflow, personal + team calendars with per-day/per-person drilldown, analytics charts, dedicated
+  Requests/Approvals pages, a once-per-day clock-in cap, and a nightly job that flags `missed_clockout`.
+- **Build Phase 2 so far:** all of Tier 0 (super admin, arbitrary working days, per-org timezone) and
+  Tier 1 (seven quick wins, plus the left-sidebar nav) on 2026-08-09; from Tier 2, the Company page
+  and approval-gated profile edits on 2026-11-02 (PRs #2 and #5).
+- **Bugs and gaps fixed along the way (2026-11-02):** weekly reports were firing on Tuesday instead of
+  Monday (APScheduler numbers weekdays from Monday — PR #3); any admin could change `organizations.plan`
+  or anyone's name/email directly through PostgREST (now blocked by DB triggers — PRs #2 and #5); the
+  profile request list flashed empty while loading (PR #6).
+- **Testing:** an offline pytest suite (`backend/tests`) and a live end-to-end suite (`e2e/`) that
+  runs against production as a super admin, admin and staff member in a dedicated test org. Last run:
+  API 90/90, UI 40/40. Every migration in `supabase/migrations/` is applied to production.
 
-This file is Build Phase 2 — everything queued up for next time, in the order I'd tackle it and why.
-It's meant to be read cold, so each item has enough context to pick back up without re-deriving it.
+**Open follow-ups from 2026-11-02:**
+- One real email change end to end (request on `/profile` → another admin approves → click the
+  confirmation link → login switches). Needs an inbox, so it isn't in the E2E suite.
+- Confirm the first Monday-dated weekly report appears by 2026-11-09 (the Tuesday fix, PR #3).
+- Supabase Auth: allow `https://attendance-saa-s.vercel.app/profile` as a redirect URL, and decide on
+  "Secure email change" (on = both old and new address must confirm, two emails per change).
+
+This file is Build Phase 2 — everything queued up, in the order I'd tackle it and why. It's meant to
+be read cold, so each item has enough context to pick back up without re-deriving it.
 
 ## How to use this doc
 
@@ -38,19 +52,19 @@ existing orgs' admins were backfilled to super_admin for the same reason. Manage
 roles" section on the Team page, visible to super admins only. This unlocks #1, #4, #7, #17, and the
 company-page logo/color-scheme item below.
 
-### ~~Configurable working days (arbitrary days, not just "first N")~~ — done, drafted 2026-08-09
+### ~~Configurable working days (arbitrary days, not just "first N")~~ — done, shipped 2026-08-09
 *User's #18.* `organizations.working_days` is now a 7-bit mask (bit i = weekday i is a working day,
 Monday=0..Sunday=6), replacing the old "5/6/7 = the first N weekdays" int — an org can express e.g.
 Tue–Sat now. The mask only exists at the storage boundary (`repositories/organizations.py`'s
 `mask_to_days`/`days_to_mask`); everything above that (`compute_streak`, `late_rate_by_weekday`,
 the closeout job's non-working-day skip, `PATCH /admin/settings`) works with a plain list of weekday
 indices. `Team.tsx`'s settings UI is now a 7-button Mon–Sun toggle row instead of a 5/6/7 dropdown.
-**Written but not yet applied/live-tested** — needs migration `20260809100000_working_days_bitmask.sql`
-run first (backfills old N values into the equivalent mask, preserving current behavior exactly).
+**Applied and live-tested** — migration `20260809100000_working_days_bitmask.sql` backfilled old N
+values into the equivalent mask, preserving existing behavior exactly.
 This unlocks #4 (holidays) and #7 (shift times), both of which need a correct "is this a working day"
 to build on.
 
-### ~~Timezone handling~~ — done, drafted 2026-08-09
+### ~~Timezone handling~~ — done, shipped 2026-08-09
 *Not in your list — flagged while building the closeout job.* Every "what day is it" calculation now
 converts through `organizations.timezone` (IANA name, e.g. `Asia/Manila`, default `UTC`) instead of
 assuming UTC midnight == the org's local midnight: the once-per-day clock-in cap
@@ -62,13 +76,13 @@ target day independently as "now in that org's own timezone, minus one day," so 
 depend on when in UTC the cron fires or how far an org's offset is from it. Team.tsx's settings
 section grew a timezone `<select>` (populated from the browser's own `Intl.supportedValuesOf`) next
 to the working-days toggle row — both save independently now (`UpdateOrgSettings` fields are optional).
-**Written but not yet applied/live-tested** — needs migration `20260809120000_org_timezone.sql` run
-first. This unlocks #4 (holidays), #5 (overtime), #7 (shift times), and #8 (grace period), all of
+**Applied and live-tested** (migration `20260809120000_org_timezone.sql`; the E2E suite checks that
+"today" moves with the org timezone). This unlocks #4 (holidays), #5 (overtime), #7 (shift times), and #8 (grace period), all of
 which get meaningfully harder to reason about correctly without a real notion of "today" to build on.
 
 ---
 
-## Tier 1 — Quick wins (no new data model, low risk, can do anytime) — done, drafted 2026-08-09
+## Tier 1 — Quick wins (no new data model, low risk, can do anytime) — done, shipped 2026-08-09
 
 All seven shipped together as one round, no DB migration needed (pure code — the four Tier 0
 migrations were the only schema changes in Build Phase 2 so far).
@@ -126,7 +140,7 @@ record yet) instead — verified with a synthetic stale-record test before it ev
 
 ## Tier 2 — Medium (new tables or endpoints, but contained scope)
 
-### ~~Company page~~ — done, drafted 2026-11-02
+### ~~Company page~~ — done, shipped 2026-11-02 (PR #2)
 *User's #1.* New `/company` page (admins only, sidebar link after Analytics) backed by one
 `GET /admin/organization`: name, plan, created date, headcount by role, plus the org's working days
 and timezone. **Org settings moved here from Team.tsx** — same controls, same
@@ -135,8 +149,8 @@ and timezone. **Org settings moved here from Team.tsx** — same controls, same
 `demo` plan like invites are) plus a new `organizations_column_guard` DB trigger. That trigger also
 closes a gap that predates this page: the organizations RLS update policy is row-level, so any admin
 could previously rewrite `plan` (including to/from `demo`) straight through PostgREST — `plan` is now
-service-role only. **Written but not yet applied/live-tested** — needs migration
-`20261102090000_organizations_column_guard.sql` run first. Logo and color scheme split out below.
+service-role only. **Applied and live-tested** (migration
+`20261102090000_organizations_column_guard.sql`). Logo and color scheme split out below.
 
 ### Company logo + color scheme
 *Follow-up to #1, deferred to keep the Company page small.* Logo needs a Supabase Storage bucket with
@@ -145,7 +159,7 @@ the logo shown in the sidebar `Brand`. A per-org color scheme touches the theme 
 stay out of the 5-color status palette's way (CLAUDE.md design language) — probably accent-only.
 Both should be super-admin-only, extending `organizations_column_guard` to cover the new columns.
 
-### ~~Profile menu + editable profile (approval-gated)~~ — done, drafted 2026-11-02
+### ~~Profile menu + editable profile (approval-gated)~~ — done, shipped 2026-11-02 (PRs #5, #6)
 *User's #9.* The sidebar's name/role block is now the profile menu (My profile, Sign out) — kept in
 the sidebar instead of the "top-right icon" first sketched here, since CLAUDE.md puts all navigation
 there. `/profile` lets anyone request a new **name and/or email** with a reason; requests land in a
@@ -161,8 +175,9 @@ for the demo org (an email change there would hand over the shared public login)
 Supabase lets any signed-in user call `auth.updateUser({ email })` directly, so the auth-level email
 change can't be hard-gated; the sync trigger at least makes it visible in the app. Also, Supabase's
 "Secure email change" setting (on by default) emails both old and new addresses — two sends per
-change against the free tier's rate limit. **Written but not yet applied/live-tested** — needs
-migration `20261102100000_profile_edit_requests.sql`.
+change against the free tier's rate limit. **Applied and live-tested** (migration
+`20261102100000_profile_edit_requests.sql`), except one real email change end to end — see open
+follow-ups at the top.
 
 ### Notifications
 *User's #10.* Start **derived/computed**, not a persisted notification log with read/unread state —
@@ -228,13 +243,17 @@ discussion: single office location, or multiple? Remote/hybrid staff exemption?
   FastAPI `dependency_overrides`). It covers org schemas, the working-days mask, and the
   Company page routes' role gating. A live end-to-end suite (`e2e/`) now also runs against
   production as a super admin, admin and staff member in a dedicated test org — role gating, the
-  DB triggers/RLS hit directly, corrections, leave, timezone, and tenant isolation. Still missing, and the most valuable next: `analytics_service.py`
+  DB triggers/RLS hit directly, corrections, leave, timezone, profile edits, and tenant isolation.
+  Still missing, and the most valuable next: `analytics_service.py`
   (streaks, timezone day-bucketing) and the closeout job — two real bugs shipped there before
   (auto-`absent` records blocking future clock-ins, twice) and grace periods/overtime/holidays will
   add more day-boundary logic on top.
 - **Demo org data is date-backdated from a fixed seed point** and will look increasingly stale as real
   time passes. Eventually worth a small script to keep the trailing ~30 days populated automatically,
   or accept it as a periodic manual touch-up.
+- **Supabase's built-in mailer sends only ~2 emails/hour.** Invites, email-change confirmations
+  and (later) password resets all share it. Configure a custom SMTP provider in Supabase before
+  onboarding a real customer.
 - **No password-reset flow for staff** — only the invite flow exists. Fine while the team is you +
   test accounts; worth having before onboarding a real customer.
 - **No rate limiting on public endpoints** (`/auth/signup`'s TOTP check, invite sending). Low risk at
@@ -244,8 +263,24 @@ discussion: single office location, or multiple? Remote/hybrid staff exemption?
 
 ## Suggested order
 
-1. Tier 0, in the order listed (super admin → working days → timezone)
-2. Tier 1, any order — all independent, good filler between bigger items
-3. Tier 2, roughly as listed (shift times before grace period; super admin items whenever convenient
-   after Tier 0)
-4. Tier 3 last
+Tier 0 and Tier 1 are done, and so are the Company page and profile edits from Tier 2. Next, in this
+order:
+
+1. **Notifications** (Tier 2, ~½ day) — there are now four things that can be waiting on someone
+   (corrections, leave, profile edits, missed clock-outs) and nothing tells them. Derived on read,
+   no new table.
+2. **Analytics: `missed_clockout` + weekly breakdowns** (Tier 2, small) — `missed_clockout` is
+   missing from every chart today, so they're quietly wrong.
+3. **Tests for `analytics_service.py` and the closeout job** (from "noticed" above, small) — before
+   shift times, grace periods, holidays and overtime pile more day-boundary rules onto that code.
+4. **Shift times per employee** (Tier 2, medium–large) — the biggest unlock: real late/absent
+   detection. **Decide first:** per-person shifts, or shift templates assigned to people.
+5. **Late grace period** (Tier 2, small once 4 exists).
+6. **Holiday calendar** (Tier 2, medium).
+7. **Overtime tracking** (Tier 3) — needs 4 and 6; scope it down before starting.
+8. **Location check / geofencing** (Tier 3, large) — **decide first:** denied-permission policy,
+   one office or several, remote-staff exemption.
+
+- **Anytime:** Company logo + color scheme (Tier 2 follow-up).
+- **Before the first real customer:** custom SMTP, a staff password-reset flow, rate limiting on
+  public endpoints, and keeping the demo org's data fresh (it currently ends 2026-08-09).
