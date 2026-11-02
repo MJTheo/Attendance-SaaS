@@ -3,52 +3,15 @@ import { Navigate } from 'react-router-dom'
 import {
   api,
   isAdmin,
-  type OrgSettings,
   type Role,
   type TeamAttendanceRecord,
   type UserProfile,
-  type Weekday,
 } from '../lib/api'
 import { DEMO_ADMIN_EMAIL } from '../lib/demo'
 import { AppShell } from '../components/AppShell'
 import { StatusDot, formatStatusLabel, statusToVariant } from '../components/StatusDot'
 import { formatTimestamp } from '../lib/datetime'
 import { formatPeriodLabel, periodRange, shiftPeriod, type Granularity } from '../lib/period'
-
-const WEEKDAYS: { value: Weekday; short: string; full: string }[] = [
-  { value: 0, short: 'Mon', full: 'Monday' },
-  { value: 1, short: 'Tue', full: 'Tuesday' },
-  { value: 2, short: 'Wed', full: 'Wednesday' },
-  { value: 3, short: 'Thu', full: 'Thursday' },
-  { value: 4, short: 'Fri', full: 'Friday' },
-  { value: 5, short: 'Sat', full: 'Saturday' },
-  { value: 6, short: 'Sun', full: 'Sunday' },
-]
-
-function describeWorkingDays(days: number[]): string {
-  const set = new Set(days)
-  return WEEKDAYS.filter((d) => set.has(d.value))
-    .map((d) => d.full)
-    .join(', ')
-}
-
-// IANA zone names, from the browser itself — avoids shipping/maintaining a
-// static list. Falls back to a small curated set on older browsers without
-// Intl.supportedValuesOf (Safari < 17, e.g.).
-const TIMEZONES: string[] =
-  typeof Intl.supportedValuesOf === 'function'
-    ? Intl.supportedValuesOf('timeZone')
-    : [
-        'UTC',
-        'America/New_York',
-        'America/Los_Angeles',
-        'Europe/London',
-        'Europe/Berlin',
-        'Asia/Manila',
-        'Asia/Tokyo',
-        'Asia/Kolkata',
-        'Australia/Sydney',
-      ]
 
 const ROLE_LABEL: Record<Role, string> = {
   staff: 'Staff',
@@ -76,7 +39,6 @@ export function Team() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [records, setRecords] = useState<TeamAttendanceRecord[]>([])
   const [recordsLoading, setRecordsLoading] = useState(true)
-  const [orgSettings, setOrgSettings] = useState<OrgSettings | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [inviteEmail, setInviteEmail] = useState('')
@@ -84,7 +46,6 @@ export function Team() {
   const [inviteError, setInviteError] = useState<string | null>(null)
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null)
   const [inviting, setInviting] = useState(false)
-  const [savingSettings, setSavingSettings] = useState(false)
   const [granularity, setGranularity] = useState<Granularity>('week')
   const [reference, setReference] = useState(() => new Date())
   const [members, setMembers] = useState<UserProfile[]>([])
@@ -97,7 +58,6 @@ export function Team() {
       const me = await api.me()
       setProfile(me)
       if (!isAdmin(me)) return
-      setOrgSettings(await api.orgSettings())
       if (me.role === 'super_admin') setMembers(await api.teamMembers())
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load')
@@ -140,40 +100,6 @@ export function Team() {
     if (profile && isAdmin(profile)) loadAttendance()
   }, [profile, loadAttendance])
 
-  async function handleWorkingDayToggle(day: Weekday) {
-    if (!orgSettings) return
-    const set = new Set(orgSettings.working_days)
-    if (set.has(day)) {
-      set.delete(day)
-    } else {
-      set.add(day)
-    }
-    const workingDays = [...set].sort((a, b) => a - b) as Weekday[]
-    setError(null)
-    setSavingSettings(true)
-    try {
-      const updated = await api.updateOrgSettings({ working_days: workingDays })
-      setOrgSettings(updated)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update settings')
-    } finally {
-      setSavingSettings(false)
-    }
-  }
-
-  async function handleTimezoneChange(timezone: string) {
-    setError(null)
-    setSavingSettings(true)
-    try {
-      const updated = await api.updateOrgSettings({ timezone })
-      setOrgSettings(updated)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update settings')
-    } finally {
-      setSavingSettings(false)
-    }
-  }
-
   async function handleInvite(event: FormEvent) {
     event.preventDefault()
     setInviteError(null)
@@ -211,73 +137,6 @@ export function Team() {
         <h1 className="mb-4 font-sans text-lg font-semibold text-text">Team</h1>
 
         {error && <p className="mb-4 font-mono text-sm text-status-warning">{error}</p>}
-
-        {orgSettings && (
-          <section className="mb-8 rounded-lg border border-border bg-surface p-4 sm:p-6">
-            <h2 className="mb-3 font-sans text-sm font-semibold uppercase tracking-wide text-text-muted">
-              Organization settings
-            </h2>
-            <span className="mb-1 block font-mono text-xs uppercase tracking-wide text-text-muted">
-              Working days
-            </span>
-            {profile.email !== DEMO_ADMIN_EMAIL ? (
-              <div className="flex flex-wrap gap-1.5">
-                {WEEKDAYS.map((day) => {
-                  const active = orgSettings.working_days.includes(day.value)
-                  return (
-                    <button
-                      key={day.value}
-                      type="button"
-                      onClick={() => handleWorkingDayToggle(day.value)}
-                      disabled={savingSettings}
-                      aria-pressed={active}
-                      title={day.full}
-                      className={`w-14 rounded-md border px-2 py-1.5 font-mono text-xs disabled:opacity-50 ${
-                        active
-                          ? 'border-status-good bg-status-good text-bg'
-                          : 'border-border text-text-muted hover:text-text'
-                      }`}
-                    >
-                      {day.short}
-                    </button>
-                  )
-                })}
-              </div>
-            ) : (
-              <p className="font-mono text-sm text-text">{describeWorkingDays(orgSettings.working_days)}</p>
-            )}
-            <p className="mt-2 font-mono text-xs text-text-muted">
-              Controls which weekdays show up in analytics and which days count toward streaks.
-            </p>
-
-            <span className="mb-1 mt-4 block font-mono text-xs uppercase tracking-wide text-text-muted">
-              Timezone
-            </span>
-            {profile.email !== DEMO_ADMIN_EMAIL ? (
-              <select
-                value={orgSettings.timezone}
-                onChange={(e) => handleTimezoneChange(e.target.value)}
-                disabled={savingSettings}
-                className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-status-good disabled:opacity-50 sm:w-auto"
-              >
-                {!TIMEZONES.includes(orgSettings.timezone) && (
-                  <option value={orgSettings.timezone}>{orgSettings.timezone}</option>
-                )}
-                {TIMEZONES.map((tz) => (
-                  <option key={tz} value={tz}>
-                    {tz}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <p className="font-mono text-sm text-text">{orgSettings.timezone}</p>
-            )}
-            <p className="mt-2 font-mono text-xs text-text-muted">
-              Defines what "today" means for clock-in caps, streaks, and the daily closeout job — not
-              each viewer's own device timezone.
-            </p>
-          </section>
-        )}
 
         {profile.role === 'super_admin' && (
           <section className="mb-8">

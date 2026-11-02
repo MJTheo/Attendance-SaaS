@@ -37,7 +37,7 @@ Attendance status values: `present`, `late`, `early_leave`, `absent`, `missed_cl
 
 - **staff** — clock in/out, view own history and streak, submit correction requests
 - **admin** — everything staff can do, plus team dashboard, approve/reject corrections, view pattern analytics, configure org settings
-- **super_admin** — everything admin can do, plus promote/demote other users' roles. A super admin can't remove their own super_admin role (DB-enforced, so an org can never lock itself out); the org's creator becomes its first super admin at signup, since only a super admin can ever create another one.
+- **super_admin** — everything admin can do, plus promote/demote other users' roles and rename the organization. A super admin can't remove their own super_admin role (DB-enforced, so an org can never lock itself out); the org's creator becomes its first super admin at signup, since only a super admin can ever create another one.
 
 ## Build phases
 
