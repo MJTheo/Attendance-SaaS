@@ -30,13 +30,14 @@ These are non-negotiable — flag it rather than working around them:
 - `corrections` — id, attendance_record_id, requested_by, approved_by, reason, old_value, new_value, status, created_at
 - `leave_requests` — id, org_id, user_id, leave_type (sick/annual), start_date, end_date, reason, status, requested_by, approved_by, created_at, resolved_at
 - `reports` — id, org_id, type, generated_at, payload
+- `profile_edit_requests` — id, org_id, user_id, requested_by, approved_by, reason, old_value, new_value (name and/or email), status, created_at, resolved_at. Same approval workflow as corrections; nobody approves their own request unless they're the org's only admin-level member. An approved email only takes effect once the user confirms it from the new inbox (the login email lives in Supabase Auth).
 
 Attendance status values: `present`, `late`, `early_leave`, `absent`, `missed_clockout` (auto-flagged by the daily closeout job when a record is still open once its day has ended). Leave is a separate concept (its own table, its own approval workflow) rather than more `attendance_records.status` values — a leave day isn't a clock-in event to correct, it's the deliberate absence of one. Calendar/analytics views surface it alongside attendance status as `sick_leave`/`annual_leave`.
 
 ## Roles
 
-- **staff** — clock in/out, view own history and streak, submit correction requests
-- **admin** — everything staff can do, plus team dashboard, approve/reject corrections, view pattern analytics, configure org settings
+- **staff** — clock in/out, view own history and streak, submit correction, leave and profile-change requests
+- **admin** — everything staff can do, plus team dashboard, approve/reject corrections, leave and other people's profile changes, view pattern analytics, configure org settings
 - **super_admin** — everything admin can do, plus promote/demote other users' roles and rename the organization. A super admin can't remove their own super_admin role (DB-enforced, so an org can never lock itself out); the org's creator becomes its first super admin at signup, since only a super admin can ever create another one.
 
 ## Build phases

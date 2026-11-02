@@ -145,12 +145,24 @@ the logo shown in the sidebar `Brand`. A per-org color scheme touches the theme 
 stay out of the 5-color status palette's way (CLAUDE.md design language) — probably accent-only.
 Both should be super-admin-only, extending `organizations_column_guard` to cover the new columns.
 
-### Profile menu + editable profile (approval-gated)
-*User's #9.* Icon top-right → profile page showing the user's own editable fields (name, etc.),
-where an edit needs admin/super-admin approval before it takes effect. This is structurally a third
-instance of the request/approval pattern already used for corrections and leave — a
-`profile_edit_requests` table (or reuse `corrections`-style old/new value jsonb) would follow the
-same audit-trail shape. Also move Sign out into this menu (trivial, do alongside).
+### ~~Profile menu + editable profile (approval-gated)~~ — done, drafted 2026-11-02
+*User's #9.* The sidebar's name/role block is now the profile menu (My profile, Sign out) — kept in
+the sidebar instead of the "top-right icon" first sketched here, since CLAUDE.md puts all navigation
+there. `/profile` lets anyone request a new **name and/or email** with a reason; requests land in a
+"Profile change requests" queue on the Team page. New `profile_edit_requests` table, same audit shape
+as corrections (old/new jsonb, requester, approver, timestamps), one pending request per person.
+**Nobody approves their own request** unless they're the org's only admin-level member — enforced in
+the service and by RLS (`app.can_resolve_profile_edit`). An approved **name** is applied by the
+service-role client; an approved **email** only unlocks the change — the user sends themselves a
+Supabase confirmation link from `/profile`, the login switches when it's clicked, and a trigger on
+`auth.users` mirrors it into `public.users.email`. New `users_profile_fields_guard` trigger closes a
+gap where any admin could rewrite anyone's name/email straight through PostgREST. Blocked entirely
+for the demo org (an email change there would hand over the shared public login). **Known limit:**
+Supabase lets any signed-in user call `auth.updateUser({ email })` directly, so the auth-level email
+change can't be hard-gated; the sync trigger at least makes it visible in the app. Also, Supabase's
+"Secure email change" setting (on by default) emails both old and new addresses — two sends per
+change against the free tier's rate limit. **Written but not yet applied/live-tested** — needs
+migration `20261102100000_profile_edit_requests.sql`.
 
 ### Notifications
 *User's #10.* Start **derived/computed**, not a persisted notification log with read/unread state —

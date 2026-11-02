@@ -334,9 +334,60 @@ def roles():
           org["member_counts"] == {r: counts.get(r, 0) for r in ("staff", "admin", "super_admin")}, org["member_counts"])
 
 
+def change_name(who: Account, approver: Account, name: str, reason: str) -> int:
+    """Request a name change as `who` and approve it as `approver`; returns the approve status."""
+    status, request = who.api("POST", "/profile-edits", {"name": name, "reason": reason})
+    if status != 201:
+        return status
+    return approver.api("PATCH", f"/profile-edits/{request['id']}/approve")[0]
+
+
+def profile_edits():
+    staff_name, admin_name = stf.me["name"], adm.me["name"]
+    status, request = stf.api("POST", "/profile-edits", {"name": f"{staff_name} Santos", "reason": "Updated surname after marriage"})
+    check("profile", "Staff requests a name change", status == 201 and request["new_value"] == {"name": f"{staff_name} Santos"}, status)
+    check("profile", "Second pending request refused (409)",
+          stf.api("POST", "/profile-edits", {"name": "Other", "reason": "x"})[0] == 409)
+    check("profile", "Staff can't approve", stf.api("PATCH", f"/profile-edits/{request['id']}/approve")[0] == 403)
+    check("profile", "Name unchanged while pending", stf.api("GET", "/auth/me")[1]["name"] == staff_name)
+    _, queue = adm.api("GET", "/profile-edits")
+    check("profile", "Admin sees it with the requester's name",
+          any(r["id"] == request["id"] and r["user_name"] == staff_name for r in queue))
+    status, approved = adm.api("PATCH", f"/profile-edits/{request['id']}/approve")
+    check("profile", "Admin approves; audit trail complete",
+          status == 200 and approved["approved_by"] == adm.me["id"] and approved["resolved_at"]
+          and approved["old_value"] == {"name": staff_name}, status)
+    check("profile", "Name applied after approval", stf.api("GET", "/auth/me")[1]["name"] == f"{staff_name} Santos")
+    check("profile", "Revert through another approved request",
+          change_name(stf, sup, staff_name, "Going back to my previous name") == 200
+          and stf.api("GET", "/auth/me")[1]["name"] == staff_name)
+
+    status, own = adm.api("POST", "/profile-edits", {"name": f"{admin_name} Reyes", "reason": "Adding my surname"})
+    check("profile", "Admin can't approve their own request (another admin exists)",
+          adm.api("PATCH", f"/profile-edits/{own['id']}/approve")[0] == 403)
+    check("profile", "Super admin rejects it instead", sup.api("PATCH", f"/profile-edits/{own['id']}/reject")[0] == 200)
+    check("profile", "Rejected request changed nothing", adm.api("GET", "/auth/me")[1]["name"] == admin_name)
+
+    status, email_request = stf.api("POST", "/profile-edits", {"email": "new-address@example.com", "reason": "New work email"})
+    check("profile", "Staff requests an email change", status == 201, status)
+    check("profile", "No confirmation email before approval (409)",
+          stf.api("POST", f"/profile-edits/{email_request['id']}/send-email-confirmation")[0] == 409)
+    sup.api("PATCH", f"/profile-edits/{email_request['id']}/reject")
+    check("profile", "No confirmation email for a rejected change (409)",
+          stf.api("POST", f"/profile-edits/{email_request['id']}/send-email-confirmation")[0] == 409)
+
+    status, body = adm.db("PATCH", f"/users?id=eq.{stf.me['id']}", {"name": "Renamed directly"})
+    check("profile", "Admin direct DB name change refused (users_profile_fields_guard)", status >= 400, f"{status} {body}")
+    status, body = stf.db("PATCH", f"/profile_edit_requests?user_id=eq.{stf.me['id']}", {"status": "approved"})
+    check("profile", "Staff can't approve their own request directly in the DB", status >= 400 or body == [], status)
+    check("profile", "Profile edits blocked for the demo org",
+          demo.api("POST", "/profile-edits", {"email": "attacker@example.com", "reason": "x"})[0] == 403)
+
+
 def isolation():
     tables = {"organizations": "id", "users": "org_id", "attendance_records": "org_id",
-              "corrections": "org_id", "leave_requests": "org_id", "reports": "org_id"}
+              "corrections": "org_id", "leave_requests": "org_id", "reports": "org_id",
+              "profile_edit_requests": "org_id"}
     for who in (sup, adm, stf):
         leaks = {t: n for t, col in tables.items()
                  if (n := len({r[col] for r in who.db("GET", f"/{t}?select={col}")[1]} - {ORG}))}
@@ -369,9 +420,15 @@ def isolation():
 try:
     for area, fn in [("accounts", accounts), ("gating", gating), ("db", db_guards), ("settings", settings),
                      ("clock", clocking), ("corrections", corrections), ("leave", leave), ("roles", roles),
-                     ("isolation", isolation)]:
+                     ("profile", profile_edits), ("isolation", isolation)]:
         section(area, fn)
 finally:
+    # Put names back if a profile check failed half-way (through the same approval flow).
+    for who, approver, name in ((stf, sup, stf.me["name"]), (adm, sup, adm.me["name"])):
+        if who.api("GET", "/auth/me")[1]["name"] != name:
+            for pending in (r for r in who.api("GET", "/profile-edits")[1] if r["status"] == "pending" and r["user_id"] == who.me["id"]):
+                approver.api("PATCH", f"/profile-edits/{pending['id']}/reject")
+            change_name(who, approver, name, "Restoring my name")
     sup.api("PATCH", "/admin/organization", {"name": ORIGINAL["name"]})
     sup.api("PATCH", "/admin/settings", {"working_days": ORIGINAL["working_days"], "timezone": ORIGINAL["timezone"]})
     sup.api("PATCH", f"/admin/users/{stf.me['id']}/role", {"role": "staff"})
