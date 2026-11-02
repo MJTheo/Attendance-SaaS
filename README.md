@@ -48,6 +48,7 @@ The non-negotiable rules this project was built around:
 - **`organizations.working_days` is stored as a 7-bit mask, not an int count.** The original "5/6/7 = the first N weekdays" design couldn't express a Tue–Sat schedule. The mask only exists at the storage boundary (`repositories/organizations.py`'s `mask_to_days`/`days_to_mask`) — every consumer (streak calculation, the late-rate-by-weekday chart, the daily closeout job's non-working-day check, the settings UI) works with a plain list of weekday indices.
 - **A day with no attendance record reads as "no data", not "confirmed absent."** The closeout job used to auto-create a real `absent` row for every no-show; it now only flags abandoned open shifts as `missed_clockout`. Existing auto-absent rows from before this change are left alone as historical fact rather than backfill-deleted, since mass-deleting real `attendance_records` outside the corrections flow would itself violate the no-silent-edits rule. `compute_streak` anchors its backward walk on "today" (or yesterday, if today has no record yet) rather than the latest date with any record, specifically because it can no longer rely on a fresh auto-absent row to keep recent days "seen."
 - **Every "what day is it" calculation is scoped to the org's own timezone (`organizations.timezone`), not UTC or the server's clock.** The once-per-day clock-in cap, streaks, the daily closeout job's target day, and every calendar/analytics day-bucketing function all convert through it (`analytics_service.py`'s `_to_local_date`/`local_day_bounds`). This matters most for the closeout job: without it, an org meaningfully outside UTC could get flagged `missed_clockout` mid-shift or marked `absent` before its day had actually started locally. The closeout job computes each org's target day independently as "now in that org's timezone, minus one day," so correctness doesn't depend on when in UTC the cron happens to fire.
+- **Org columns have different edit rights, enforced by a trigger, not just RLS.** Any admin can change `working_days`/`timezone`; only a super admin can rename the org; nobody but the backend's service role can change `plan`. The `organizations_column_guard` trigger enforces this at the DB layer for the same reason `users_role_change_guard` exists — the RLS update policy is row-level, so on its own it would let any admin rewrite any column directly through PostgREST, `plan` included.
 
 ## Local development
 
@@ -69,6 +70,11 @@ npm run dev
 # Database
 supabase link --project-ref <your-project-ref>
 supabase db push  # applies supabase/migrations/*.sql
+
+# Backend tests (no Supabase or .env needed — repositories are faked)
+cd backend
+pip install -r requirements-dev.txt
+python -m pytest
 ```
 
 ## Build phases

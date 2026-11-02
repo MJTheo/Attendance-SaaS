@@ -126,9 +126,24 @@ record yet) instead — verified with a synthetic stale-record test before it ev
 
 ## Tier 2 — Medium (new tables or endpoints, but contained scope)
 
-### Company page
-*User's #1.* New page showing org info (name, plan, logo, color scheme once #1's sub-items exist),
-editable by super admin only. Needs Tier 0's super admin role first.
+### ~~Company page~~ — done, drafted 2026-11-02
+*User's #1.* New `/company` page (admins only, sidebar link after Analytics) backed by one
+`GET /admin/organization`: name, plan, created date, headcount by role, plus the org's working days
+and timezone. **Org settings moved here from Team.tsx** — same controls, same
+`PATCH /admin/settings`, still editable by any admin (CLAUDE.md's "admin → configure org settings").
+**Renaming is super-admin-only**: `PATCH /admin/organization` (`require_super_admin`, blocked for the
+`demo` plan like invites are) plus a new `organizations_column_guard` DB trigger. That trigger also
+closes a gap that predates this page: the organizations RLS update policy is row-level, so any admin
+could previously rewrite `plan` (including to/from `demo`) straight through PostgREST — `plan` is now
+service-role only. **Written but not yet applied/live-tested** — needs migration
+`20261102090000_organizations_column_guard.sql` run first. Logo and color scheme split out below.
+
+### Company logo + color scheme
+*Follow-up to #1, deferred to keep the Company page small.* Logo needs a Supabase Storage bucket with
+org-scoped storage policies, an `organizations.logo_path` column, upload UI on the Company page, and
+the logo shown in the sidebar `Brand`. A per-org color scheme touches the theme tokens and has to
+stay out of the 5-color status palette's way (CLAUDE.md design language) — probably accent-only.
+Both should be super-admin-only, extending `organizations_column_guard` to cover the new columns.
 
 ### Profile menu + editable profile (approval-gated)
 *User's #9.* Icon top-right → profile page showing the user's own editable fields (name, etc.),
@@ -196,11 +211,13 @@ discussion: single office location, or multiple? Remote/hybrid staff exemption?
 
 ## Noticed but not on your list
 
-- **No automated tests.** Two real bugs shipped and were only caught by live-testing against the demo
-  data this session (auto-`absent` records permanently blocking future clock-ins, twice, in two
-  different code paths). Nothing urgent, but the more day-boundary/status logic gets added (grace
-  periods, overtime, holidays), the more a small pytest suite around `analytics_service.py` and the
-  closeout job would pay for itself.
+- **Automated tests — started, still thin.** A pytest suite now exists (`backend/tests`,
+  `requirements-dev.txt`; runs with no Supabase, repositories faked via `monkeypatch` +
+  FastAPI `dependency_overrides`). It covers org schemas, the working-days mask, and the
+  Company page routes' role gating. Still missing, and the most valuable next: `analytics_service.py`
+  (streaks, timezone day-bucketing) and the closeout job — two real bugs shipped there before
+  (auto-`absent` records blocking future clock-ins, twice) and grace periods/overtime/holidays will
+  add more day-boundary logic on top.
 - **Demo org data is date-backdated from a fixed seed point** and will look increasingly stale as real
   time passes. Eventually worth a small script to keep the trailing ~30 days populated automatically,
   or accept it as a periodic manual touch-up.
