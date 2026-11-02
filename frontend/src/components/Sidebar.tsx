@@ -122,6 +122,9 @@ function NavItems({ profile, onNavigate }: { profile: UserProfile; onNavigate: (
           <NavLink to="/analytics" className={navLinkClass} onClick={onNavigate}>
             Analytics
           </NavLink>
+          <NavLink to="/company" className={navLinkClass} onClick={onNavigate}>
+            Company
+          </NavLink>
         </>
       )}
     </nav>

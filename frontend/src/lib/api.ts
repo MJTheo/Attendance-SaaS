@@ -174,6 +174,16 @@ export interface OrgSettings {
   timezone: string
 }
 
+export type RoleCounts = Record<Role, number>
+
+export interface Organization extends OrgSettings {
+  id: string
+  name: string
+  plan: string
+  created_at: string
+  member_counts: RoleCounts
+}
+
 export interface Correction {
   id: string
   attendance_record_id: string
@@ -230,6 +240,12 @@ export const api = {
     apiFetch<OrgSettings>('/admin/settings', {
       method: 'PATCH',
       body: JSON.stringify(patch),
+    }),
+  organization: () => apiFetch<Organization>('/admin/organization'),
+  renameOrganization: (name: string) =>
+    apiFetch<Organization>('/admin/organization', {
+      method: 'PATCH',
+      body: JSON.stringify({ name }),
     }),
   requestLeave: (leaveType: 'sick' | 'annual', startDate: string, endDate: string, reason: string) =>
     apiFetch<LeaveRequest>('/leave', {

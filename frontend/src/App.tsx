@@ -5,6 +5,7 @@ import { Dashboard } from './routes/Dashboard'
 import { Team } from './routes/Team'
 import { Analytics } from './routes/Analytics'
 import { Calendar } from './routes/Calendar'
+import { Company } from './routes/Company'
 import { LeaveRequests } from './routes/LeaveRequests'
 import { CorrectionRequests } from './routes/CorrectionRequests'
 import { LeaveApprovals } from './routes/LeaveApprovals'
@@ -23,6 +24,7 @@ function App() {
           <Route path="/team" element={<Team />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/calendar" element={<Calendar />} />
+          <Route path="/company" element={<Company />} />
           <Route path="/requests" element={<Navigate to="/requests/leave" replace />} />
           <Route path="/requests/leave" element={<LeaveRequests />} />
           <Route path="/requests/corrections" element={<CorrectionRequests />} />
