@@ -1,6 +1,6 @@
 # Landas Time
 
-**Status: v0.1.1-alpha (Build Phase 1)** — foundation, corrections, leave requests, calendar, analytics, and attendance-integrity automation (once-per-day clock cap, missed-clockout/absence auto-flagging) are deployed and live at the demo link below. Next up is Build Phase 2 — see [ROADMAP.md](ROADMAP.md).
+**Status: v0.1.2-alpha (Build Phase 2, in progress)** — foundation, corrections, leave requests, calendar, analytics, and attendance-integrity automation (once-per-day clock cap, missed-clockout auto-flagging) are deployed and live at the demo link below, along with Build Phase 2 so far: super admin role, configurable working days and timezone, the Company page, and approval-gated profile edits. Next up is notifications — see [ROADMAP.md](ROADMAP.md).
 
 A multi-tenant workforce attendance system: organizations sign up, staff clock in/out, corrections go through an auditable approval workflow, and admins get team-wide attendance analytics.
 

@@ -2,7 +2,7 @@
 
 ## Where things stand
 
-**Build Phase 2 in progress** — last updated 2026-11-02. Live at https://attendance-saa-s.vercel.app.
+**v0.1.2-alpha — Build Phase 2 (in progress)**, last updated 2026-11-02. Live at https://attendance-saa-s.vercel.app.
 
 - **Build Phase 1 (v0.1.1-alpha, 2026-08-08):** the original 4-phase plan (foundation, corrections +
   admin dashboard, analytics, polish) plus an extra round: sick/annual leave with its own approval
