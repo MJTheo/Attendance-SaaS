@@ -49,3 +49,6 @@ Thumbs.db
 *.log
 logs/
 .cache/
+
+# --- Live E2E suite ---
+e2e/output/
