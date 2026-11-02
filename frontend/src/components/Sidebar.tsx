@@ -85,6 +85,68 @@ function NavGroup({
   )
 }
 
+// The name/role block doubles as the profile menu — kept in the sidebar
+// rather than a top-right avatar, since navigation lives in the sidebar.
+function ProfileMenu({ profile, onNavigate }: { profile: UserProfile; onNavigate: () => void }) {
+  const location = useLocation()
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const active = location.pathname === '/profile'
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-label="Profile menu"
+        className={`flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left transition-colors ${
+          active ? 'bg-status-good/10' : 'hover:bg-border/40'
+        }`}
+      >
+        <span className="min-w-0">
+          <span className="block truncate font-sans text-base font-semibold text-text">{profile.name}</span>
+          <span className="block font-mono text-xs uppercase tracking-wide text-text-muted">
+            {profile.role.replace('_', ' ')}
+          </span>
+        </span>
+        <span className="text-text-muted">
+          <ChevronIcon open={open} />
+        </span>
+      </button>
+      {open && (
+        <div className="absolute left-0 right-0 top-full z-10 mt-1 flex flex-col gap-0.5 rounded-md border border-border bg-surface p-1 font-mono text-sm shadow-lg">
+          <NavLink
+            to="/profile"
+            className={navLinkClass}
+            onClick={() => {
+              setOpen(false)
+              onNavigate()
+            }}
+          >
+            My profile
+          </NavLink>
+          <button
+            type="button"
+            onClick={() => supabase.auth.signOut()}
+            className="rounded-md px-2 py-1.5 text-left text-text-muted transition-colors hover:bg-border/40 hover:text-text"
+          >
+            Sign out
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function NavItems({ profile, onNavigate }: { profile: UserProfile; onNavigate: () => void }) {
   const admin = isAdmin(profile)
   return (
@@ -176,23 +238,13 @@ export function Sidebar({ profile }: { profile: UserProfile }) {
           </button>
         </div>
 
-        <div>
-          <p className="font-sans text-base font-semibold text-text">{profile.name}</p>
-          <p className="font-mono text-xs uppercase tracking-wide text-text-muted">{profile.role.replace('_', ' ')}</p>
-        </div>
+        <ProfileMenu profile={profile} onNavigate={() => setMobileOpen(false)} />
 
         <NavItems profile={profile} onNavigate={() => setMobileOpen(false)} />
 
-        <div className="mt-auto flex items-center gap-2">
-          <div className="hidden sm:block">
-            <ThemeToggle />
-          </div>
-          <button
-            onClick={() => supabase.auth.signOut()}
-            className="flex-1 rounded-md border border-border px-3 py-1.5 font-mono text-xs text-text-muted hover:text-text"
-          >
-            Sign out
-          </button>
+        {/* Mobile already has the theme toggle in its top bar. */}
+        <div className="mt-auto hidden sm:block">
+          <ThemeToggle />
         </div>
       </aside>
     </>

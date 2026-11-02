@@ -3,12 +3,14 @@ import { Navigate } from 'react-router-dom'
 import {
   api,
   isAdmin,
+  type ProfileEditRequest,
   type Role,
   type TeamAttendanceRecord,
   type UserProfile,
 } from '../lib/api'
 import { DEMO_ADMIN_EMAIL } from '../lib/demo'
 import { AppShell } from '../components/AppShell'
+import { ProfileEditsList } from '../components/ProfileEditsList'
 import { StatusDot, formatStatusLabel, statusToVariant } from '../components/StatusDot'
 import { formatTimestamp } from '../lib/datetime'
 import { formatPeriodLabel, periodRange, shiftPeriod, type Granularity } from '../lib/period'
@@ -51,6 +53,8 @@ export function Team() {
   const [members, setMembers] = useState<UserProfile[]>([])
   const [roleUpdatingId, setRoleUpdatingId] = useState<string | null>(null)
   const [roleError, setRoleError] = useState<string | null>(null)
+  const [profileEdits, setProfileEdits] = useState<ProfileEditRequest[]>([])
+  const [profileEditError, setProfileEditError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -58,6 +62,7 @@ export function Team() {
       const me = await api.me()
       setProfile(me)
       if (!isAdmin(me)) return
+      setProfileEdits(await api.profileEdits())
       if (me.role === 'super_admin') setMembers(await api.teamMembers())
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load')
@@ -76,6 +81,22 @@ export function Team() {
       setRoleError(err instanceof Error ? err.message : 'Failed to update role')
     } finally {
       setRoleUpdatingId(null)
+    }
+  }
+
+  async function handleProfileEdit(id: string, approve: boolean) {
+    setProfileEditError(null)
+    try {
+      if (approve) {
+        await api.approveProfileEdit(id)
+      } else {
+        await api.rejectProfileEdit(id)
+      }
+      // Re-read everything: an approved name shows up in the roles table too.
+      await load()
+    } catch (err) {
+      // e.g. "Another admin has to review your own profile change"
+      setProfileEditError(err instanceof Error ? err.message : 'Failed to update request')
     }
   }
 
@@ -137,6 +158,30 @@ export function Team() {
         <h1 className="mb-4 font-sans text-lg font-semibold text-text">Team</h1>
 
         {error && <p className="mb-4 font-mono text-sm text-status-warning">{error}</p>}
+
+        <section className="mb-8">
+          <h2 className="mb-3 font-sans text-sm font-semibold uppercase tracking-wide text-text-muted">
+            Profile change requests
+          </h2>
+          {profileEditError && <p className="mb-3 font-mono text-xs text-status-warning">{profileEditError}</p>}
+          <ProfileEditsList
+            requests={profileEdits.filter((r) => r.status === 'pending')}
+            showActions
+            showRequester
+            onApprove={(id) => handleProfileEdit(id, true)}
+            onReject={(id) => handleProfileEdit(id, false)}
+          />
+          {profileEdits.some((r) => r.status !== 'pending') && (
+            <details className="mt-3">
+              <summary className="cursor-pointer font-mono text-xs text-text-muted hover:text-text">
+                Resolved requests
+              </summary>
+              <div className="mt-3">
+                <ProfileEditsList requests={profileEdits.filter((r) => r.status !== 'pending')} showRequester />
+              </div>
+            </details>
+          )}
+        </section>
 
         {profile.role === 'super_admin' && (
           <section className="mb-8">

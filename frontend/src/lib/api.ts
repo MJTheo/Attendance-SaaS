@@ -199,6 +199,29 @@ export interface Correction {
   resolved_at: string | null
 }
 
+export interface ProfileFields {
+  name?: string
+  email?: string
+}
+
+export interface ProfileEditRequest {
+  id: string
+  org_id: string
+  user_id: string
+  user_name: string | null
+  requested_by: string
+  approved_by: string | null
+  reason: string
+  old_value: ProfileFields
+  new_value: ProfileFields
+  status: 'pending' | 'approved' | 'rejected'
+  created_at: string
+  resolved_at: string | null
+  // Approved email change whose confirmation link hasn't been clicked yet —
+  // computed server-side.
+  awaiting_email_confirmation: boolean
+}
+
 // All status/streak/pattern computation happens server-side (architecture
 // rule 3) — this client only fetches and renders what the API returns.
 export const api = {
@@ -267,6 +290,18 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ role }),
     }),
+  profileEdits: () => apiFetch<ProfileEditRequest[]>('/profile-edits'),
+  requestProfileEdit: (fields: ProfileFields, reason: string) =>
+    apiFetch<ProfileEditRequest>('/profile-edits', {
+      method: 'POST',
+      body: JSON.stringify({ ...fields, reason }),
+    }),
+  approveProfileEdit: (id: string) =>
+    apiFetch<ProfileEditRequest>(`/profile-edits/${id}/approve`, { method: 'PATCH' }),
+  rejectProfileEdit: (id: string) =>
+    apiFetch<ProfileEditRequest>(`/profile-edits/${id}/reject`, { method: 'PATCH' }),
+  sendEmailConfirmation: (id: string) =>
+    apiFetch<ProfileEditRequest>(`/profile-edits/${id}/send-email-confirmation`, { method: 'POST' }),
   myDay: (isoDate: string) => apiFetch<DayDetail>(`/attendance/day/${isoDate}`),
   myToday: () => apiFetch<DayDetail>('/attendance/today'),
   teamDay: (isoDate: string) => apiFetch<TeamDayDetail[]>(`/admin/day/${isoDate}`),
