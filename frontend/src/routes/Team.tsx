@@ -164,13 +164,17 @@ export function Team() {
             Profile change requests
           </h2>
           {profileEditError && <p className="mb-3 font-mono text-xs text-status-warning">{profileEditError}</p>}
-          <ProfileEditsList
-            requests={profileEdits.filter((r) => r.status === 'pending')}
-            showActions
-            showRequester
-            onApprove={(id) => handleProfileEdit(id, true)}
-            onReject={(id) => handleProfileEdit(id, false)}
-          />
+          {loading ? (
+            <p className="font-mono text-sm text-text-muted">Loading…</p>
+          ) : (
+            <ProfileEditsList
+              requests={profileEdits.filter((r) => r.status === 'pending')}
+              showActions
+              showRequester
+              onApprove={(id) => handleProfileEdit(id, true)}
+              onReject={(id) => handleProfileEdit(id, false)}
+            />
+          )}
           {profileEdits.some((r) => r.status !== 'pending') && (
             <details className="mt-3">
               <summary className="cursor-pointer font-mono text-xs text-text-muted hover:text-text">

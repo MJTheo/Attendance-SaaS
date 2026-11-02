@@ -144,7 +144,9 @@ export function Profile() {
 
         <section className={SECTION_CLASS}>
           <h2 className={SECTION_HEADING_CLASS}>Request a change</h2>
-          {isDemo ? (
+          {loading ? (
+            <p className="font-mono text-sm text-text-muted">Loading…</p>
+          ) : isDemo ? (
             <p className="font-mono text-sm text-text-muted">Profile changes are disabled for the shared demo account.</p>
           ) : pending ? (
             <p className="font-mono text-sm text-text-muted">
@@ -192,7 +194,7 @@ export function Profile() {
 
         <section>
           <h2 className={SECTION_HEADING_CLASS}>My change requests</h2>
-          <ProfileEditsList requests={mine} />
+          {loading ? <p className="font-mono text-sm text-text-muted">Loading…</p> : <ProfileEditsList requests={mine} />}
         </section>
       </main>
     </AppShell>
