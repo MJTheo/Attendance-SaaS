@@ -13,7 +13,7 @@ from app.repositories.users import UsersRepository
 from app.schemas.analytics import CalendarDay, DayStatusCounts, Report, TeamAnalytics, TeamDayDetail
 from app.schemas.attendance import TeamAttendanceRecord
 from app.schemas.auth import InviteRequest, UserProfile
-from app.schemas.organization import OrgSettings, UpdateOrgSettings
+from app.schemas.organization import Organization, OrgSettings, RenameOrganization, UpdateOrgSettings
 from app.schemas.user import UpdateUserRole
 from app.services.analytics_service import (
     build_personal_calendar,
@@ -33,6 +33,7 @@ from app.services.invites_service import (
     InviteRateLimitedError,
     InvitesService,
 )
+from app.services.organization_service import count_members_by_role
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -180,6 +181,32 @@ def update_org_settings(
     admin: dict = Depends(require_admin),
 ):
     return OrganizationsRepository(user_client).update_settings(admin["org_id"], payload.working_days, payload.timezone)
+
+
+@router.get("/organization", response_model=Organization)
+def get_organization(
+    user_client: Client = Depends(get_user_client),
+    admin: dict = Depends(require_admin),
+):
+    org = OrganizationsRepository(user_client).get(admin["org_id"])
+    members = UsersRepository(user_client).list_for_org()
+    return {**org, "member_counts": count_members_by_role(members)}
+
+
+@router.patch("/organization", response_model=Organization)
+def rename_organization(
+    payload: RenameOrganization,
+    user_client: Client = Depends(get_user_client),
+    super_admin: dict = Depends(require_super_admin),
+):
+    orgs = OrganizationsRepository(user_client)
+    # Same rule as InvitesService's demo-invite block: the demo org's login
+    # is public, so it stays read-only for anything that changes identity.
+    if orgs.get(super_admin["org_id"])["plan"] == "demo":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "The demo organization can't be renamed")
+    org = orgs.rename(super_admin["org_id"], payload.name)
+    members = UsersRepository(user_client).list_for_org()
+    return {**org, "member_counts": count_members_by_role(members)}
 
 
 @router.get("/reports", response_model=list[Report])

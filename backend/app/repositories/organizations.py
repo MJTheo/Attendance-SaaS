@@ -25,7 +25,7 @@ class OrganizationsRepository:
     def get(self, org_id: str) -> dict:
         response = (
             self._client.table("organizations")
-            .select("id, name, plan, working_days, timezone")
+            .select("id, name, plan, created_at, working_days, timezone")
             .eq("id", org_id)
             .limit(1)
             .execute()
@@ -41,5 +41,12 @@ class OrganizationsRepository:
             patch["timezone"] = timezone
 
         response = self._client.table("organizations").update(patch).eq("id", org_id).execute()
+        row = response.data[0]
+        return {**row, "working_days": mask_to_days(row["working_days"])}
+
+    def rename(self, org_id: str, name: str) -> dict:
+        # Super-admin-only — enforced router-side (require_super_admin) and,
+        # as defense in depth, by the organizations_column_guard DB trigger.
+        response = self._client.table("organizations").update({"name": name}).eq("id", org_id).execute()
         row = response.data[0]
         return {**row, "working_days": mask_to_days(row["working_days"])}

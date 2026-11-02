@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -43,3 +44,38 @@ class UpdateOrgSettings(BaseModel):
         if self.working_days is None and self.timezone is None:
             raise ValueError("Provide working_days and/or timezone")
         return self
+
+
+class RoleCounts(BaseModel):
+    staff: int
+    admin: int
+    super_admin: int
+
+
+class Organization(BaseModel):
+    # Company page payload: org identity plus the same working_days/timezone
+    # OrgSettings exposes, so the page needs a single read.
+    id: str
+    name: str
+    plan: str
+    created_at: datetime
+    working_days: list[Weekday]
+    timezone: str
+    member_counts: RoleCounts
+
+
+ORG_NAME_MAX_LENGTH = 100
+
+
+class RenameOrganization(BaseModel):
+    name: str
+
+    @field_validator("name")
+    @classmethod
+    def _trimmed_and_bounded(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Organization name can't be blank")
+        if len(value) > ORG_NAME_MAX_LENGTH:
+            raise ValueError(f"Organization name must be at most {ORG_NAME_MAX_LENGTH} characters")
+        return value
