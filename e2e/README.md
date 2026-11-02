@@ -7,8 +7,8 @@ proves the deployed RLS policies, triggers and role gating actually hold.
 
 | Script | What it covers |
 |---|---|
-| `live_api.py` | Role gating on every admin route; DB-layer guards hit directly through PostgREST (column guard, role guard, no silent edits); rename, working days, timezone moving "today"; clock in/out and the once-per-day cap; corrections with audit trail; leave approve/reject on the calendar; role promotion/demotion; tenant isolation against the public demo org |
-| `live_ui.cjs` | What each role sees: staff nav and redirects, admin pages, super-admin rename and roles table, dropcards, theme toggle, mobile drawer, and the public "View live demo" login |
+| `live_api.py` | Role gating on every admin route; DB-layer guards hit directly through PostgREST (column guard, role guard, profile-field guard, no silent edits); rename, working days, timezone moving "today"; clock in/out and the once-per-day cap; corrections with audit trail; leave approve/reject on the calendar; role promotion/demotion; approval-gated profile edits (name applied on approval and reverted the same way, no self-approval, email confirmation gating, demo org blocked); tenant isolation against the public demo org |
+| `live_ui.cjs` | What each role sees: staff nav and redirects, profile menu and My profile page, admin pages (including the profile-change queue), super-admin rename and roles table, dropcards, theme toggle, mobile drawer, and the public "View live demo" login |
 
 ## It writes to production
 
@@ -19,7 +19,10 @@ Use a **dedicated test org**, never a real customer's. Each run of
   the same day just checks the 409);
 - files two corrections on the staff member's latest record (one approved,
   marking it late; one rejected);
-- files two leave requests about five weeks out (one approved, one rejected).
+- files two leave requests about five weeks out (one approved, one rejected);
+- files profile change requests: the staff member's name is changed and changed back
+  (both approved), an admin's own request and an email change are rejected. No
+  confirmation email is ever sent.
 
 Everything else it changes (org name, working days, timezone, the staff
 member's role) is put back at the end, even if a check fails. Against the

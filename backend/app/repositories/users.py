@@ -39,3 +39,9 @@ class UsersRepository:
         # users_role_change_guard DB trigger.
         response = self._client.table("users").update({"role": role}).eq("id", user_id).execute()
         return response.data[0] if response.data else None
+
+    def update_name(self, user_id: str, name: str) -> None:
+        # Only ever called with the service-role client, applying an approved
+        # profile edit — end-user sessions can't change name directly
+        # (users_profile_fields_guard).
+        self._client.table("users").update({"name": name}).eq("id", user_id).execute()
