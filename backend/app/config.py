@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     # added to the Supabase project's Auth > URL Configuration allow-list,
     # or Supabase silently ignores it and falls back to the Site URL.
     frontend_url: str = "http://localhost:5173"
+    # Standard crontab syntax, including its day-of-week numbering (Sunday =
+    # 0, so "1" = Monday) — see app.jobs.schedule.crontab_trigger.
     report_schedule_cron: str = "0 6 * * 1"
     # Runs shortly after midnight UTC to finalize the day that just ended:
     # flags still-open attendance records missed_clockout, auto-creates
