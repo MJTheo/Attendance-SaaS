@@ -31,7 +31,8 @@ export function ApprovalQueue({
 }: {
   heading: string
   pending: PendingItem[]
-  resolved: ResolvedItem[]
+  // Omitted where only what's waiting matters (the Inbox).
+  resolved?: ResolvedItem[]
   emptyTitle: string
   emptyBody: string
   onDecide: (id: string, approve: boolean) => Promise<void>
@@ -118,22 +119,26 @@ export function ApprovalQueue({
         </div>
       )}
 
-      <h2 className="mb-0 mt-2.5 text-base font-semibold">Resolved</h2>
-      <div className="rounded-[16px] bg-surface">
-        {resolved.length === 0 && <div className="px-4 py-5 text-sm text-text-muted sm:px-5">Nothing resolved yet.</div>}
-        {resolved.map((item) => (
-          <div
-            key={item.id}
-            className="grid min-h-[54px] grid-cols-1 items-center gap-x-4 gap-y-1.5 border-b border-border px-4 py-2.5 text-sm last:border-b-0 sm:grid-cols-[200px_minmax(0,1fr)_auto] sm:px-5"
-          >
-            <span className="font-semibold [overflow-wrap:anywhere]">{item.who}</span>
-            <span className="text-text-muted [overflow-wrap:anywhere]">{item.summary}</span>
-            <span className="justify-self-start">
-              <StatusDot status={item.status} />
-            </span>
+      {resolved && (
+        <>
+          <h2 className="mb-0 mt-2.5 text-base font-semibold">Resolved</h2>
+          <div className="rounded-[16px] bg-surface">
+            {resolved.length === 0 && <div className="px-4 py-5 text-sm text-text-muted sm:px-5">Nothing resolved yet.</div>}
+            {resolved.map((item) => (
+              <div
+                key={item.id}
+                className="grid min-h-[54px] grid-cols-1 items-center gap-x-4 gap-y-1.5 border-b border-border px-4 py-2.5 text-sm last:border-b-0 sm:grid-cols-[200px_minmax(0,1fr)_auto] sm:px-5"
+              >
+                <span className="font-semibold [overflow-wrap:anywhere]">{item.who}</span>
+                <span className="text-text-muted [overflow-wrap:anywhere]">{item.summary}</span>
+                <span className="justify-self-start">
+                  <StatusDot status={item.status} />
+                </span>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      )}
     </div>
   )
 }

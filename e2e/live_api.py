@@ -384,6 +384,25 @@ def profile_edits():
           demo.api("POST", "/profile-edits", {"email": "attacker@example.com", "reason": "x"})[0] == 403)
 
 
+def inbox():
+    """The Inbox page lists exactly what the badge counts, for every role."""
+    keys = {"leave": "leave_approvals", "corrections": "correction_approvals",
+            "profile_changes": "profile_changes", "missed_clockouts": "missed_clockouts"}
+    for who in (sup, adm, stf):
+        _, counts = who.api("GET", "/notifications")
+        status, items = who.api("GET", "/notifications/inbox")
+        lengths = {keys[k]: len(v) for k, v in items.items()} if status == 200 else {}
+        check("inbox", f"{who.label}: inbox items match the counts",
+              status == 200 and all(counts[c] == n for c, n in lengths.items()) and sum(lengths.values()) == counts["total"],
+              f"{status} {lengths} vs {counts}")
+    _, staff_items = stf.api("GET", "/notifications/inbox")
+    check("inbox", "Staff get no approval items",
+          not (staff_items["leave"] or staff_items["corrections"] or staff_items["profile_changes"]))
+    _, admin_items = adm.api("GET", "/notifications/inbox")
+    check("inbox", "Admin isn't asked to resolve their own profile change",
+          all(r["requested_by"] != adm.me["id"] for r in admin_items["profile_changes"]))
+
+
 def isolation():
     tables = {"organizations": "id", "users": "org_id", "attendance_records": "org_id",
               "corrections": "org_id", "leave_requests": "org_id", "reports": "org_id",
@@ -420,7 +439,7 @@ def isolation():
 try:
     for area, fn in [("accounts", accounts), ("gating", gating), ("db", db_guards), ("settings", settings),
                      ("clock", clocking), ("corrections", corrections), ("leave", leave), ("roles", roles),
-                     ("profile", profile_edits), ("isolation", isolation)]:
+                     ("profile", profile_edits), ("inbox", inbox), ("isolation", isolation)]:
         section(area, fn)
 finally:
     # Put names back if a profile check failed half-way (through the same approval flow).

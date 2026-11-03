@@ -113,6 +113,10 @@ async function staff(browser) {
     /request a change/i.test(profileText) && /Name change[\s\S]*→/.test(profileText))
   await shot(s, 'staff-profile')
   await visit(s, '/calendar', null)
+  await s.page.click('aside a:has-text("Inbox")')
+  await s.page.waitForSelector('h1:has-text("Inbox")')
+  await waitForData(s.page)
+  check('staff', 'Inbox opens from the sidebar', /waiting|All caught up/.test(await s.page.locator('main').innerText()))
   check('staff', 'Calendar has no team view', (await s.page.locator('main button', { hasText: /^Team$/ }).count()) === 0)
   await s.context.close()
 

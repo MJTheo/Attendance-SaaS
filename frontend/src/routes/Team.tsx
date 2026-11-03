@@ -5,7 +5,6 @@ import {
   isAdmin,
   type LeaveRequest,
   type ProfileEditRequest,
-  type ProfileFields,
   type Role,
   type TeamAttendanceRecord,
   type UserProfile,
@@ -14,11 +13,11 @@ import { useMe } from '../lib/me-context'
 import { Page } from '../components/Page'
 import { LoadError, Skeleton } from '../components/Skeleton'
 import { ApprovalQueue } from '../components/ApprovalQueue'
+import { PROFILE_FIELD_LABEL, changedFields, profileItem, profileToast } from '../components/approvalItems'
 import { StatusIcon, formatStatusLabel } from '../components/StatusDot'
-import { addDays, formatDateTime, formatDayLong, formatDayShort, formatTime, formatWeek, localDate, mondayOf, zonedToUtc } from '../lib/datetime'
+import { addDays, formatDayLong, formatDayShort, formatTime, formatWeek, localDate, mondayOf, zonedToUtc } from '../lib/datetime'
 
 const ROLE_LABEL: Record<Role, string> = { staff: 'Staff', admin: 'Admin', super_admin: 'Super admin' }
-const FIELD_LABEL: Record<keyof ProfileFields, string> = { name: 'Name', email: 'Email' }
 
 type Tab = 'attendance' | 'requests' | 'roles' | 'invite'
 type Granularity = 'day' | 'week' | 'month'
@@ -29,16 +28,6 @@ const SEG_OFF = 'bg-transparent text-text-muted hover:text-text'
 function initials(name: string): string {
   const parts = name.trim().split(/[\s-]+/)
   return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : (parts[0]?.[1] ?? ''))).toUpperCase()
-}
-
-function changeTitle(request: ProfileEditRequest): string {
-  const fields = Object.keys(request.new_value)
-  if (fields.length > 1) return 'Name and email change'
-  return fields[0] === 'email' ? 'Email change' : 'Name change'
-}
-
-function changedFields(request: ProfileEditRequest): (keyof ProfileFields)[] {
-  return (['name', 'email'] as const).filter((f) => request.new_value[f] !== undefined)
 }
 
 export function Team() {
@@ -324,40 +313,14 @@ function Chevron({ d }: { d: string }) {
 function RequestsTab({ edits, onDecide }: { edits: ProfileEditRequest[]; onDecide: (id: string, approve: boolean) => Promise<void> }) {
   const { me } = useMe()
   const tz = me.org_timezone
-  const pending = edits
-    .filter((r) => r.status === 'pending')
-    .map((r) => ({
-      id: r.id,
-      who: r.user_name ?? 'Someone',
-      meta: `${changeTitle(r)} · ${formatDateTime(r.created_at, tz)}`,
-      body: (
-        <div className="flex flex-col gap-2">
-          {changedFields(r).map((f) => (
-            <div key={f} className="grid grid-cols-1 items-center gap-2 sm:grid-cols-[minmax(0,1fr)_24px_minmax(0,1fr)]">
-              <div className="flex flex-col gap-0.5 rounded-xl bg-bg px-3 py-2.5">
-                <span className="text-xs text-text-muted">{FIELD_LABEL[f]} now</span>
-                <span className="[overflow-wrap:anywhere]">{r.old_value[f] ?? '—'}</span>
-              </div>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="hidden text-text-muted sm:block">
-                <path d="M5 12h14M13 6l6 6-6 6" />
-              </svg>
-              <div className="flex flex-col gap-0.5 rounded-xl bg-surface-raised px-3 py-2.5">
-                <span className="text-xs text-text-muted">Requested</span>
-                <span className="font-semibold [overflow-wrap:anywhere]">{r.new_value[f]}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      ),
-      reason: r.reason,
-    }))
+  const pending = edits.filter((r) => r.status === 'pending').map((r) => profileItem(r, tz))
   const resolved = edits
     .filter((r) => r.status !== 'pending')
     .map((r) => ({
       id: r.id,
       who: r.user_name ?? 'Someone',
       summary: changedFields(r)
-        .map((f) => `${FIELD_LABEL[f]}: ${r.old_value[f] ?? '—'} → ${r.new_value[f]}`)
+        .map((f) => `${PROFILE_FIELD_LABEL[f]}: ${r.old_value[f] ?? '—'} → ${r.new_value[f]}`)
         .join(', '),
       status: r.awaiting_email_confirmation ? 'awaiting' : r.status,
     }))
@@ -371,9 +334,7 @@ function RequestsTab({ edits, onDecide }: { edits: ProfileEditRequest[]; onDecid
         emptyTitle="No profile changes waiting"
         emptyBody="When someone asks to change their name or email, it shows up here and in your Inbox."
         onDecide={onDecide}
-        toastFor={(item, approved) =>
-          approved ? `Approved. ${item.who}’s profile is updated (a new email takes effect once they confirm it).` : `Rejected. ${item.who} will see it on their profile.`
-        }
+        toastFor={profileToast}
       />
     </section>
   )

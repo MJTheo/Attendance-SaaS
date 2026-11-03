@@ -197,10 +197,13 @@ restyles Analytics (the trend now plots a server-side `present_rate`, and the di
 missed clock-outs) and Company (a Save changes button instead of saving on every click, timezone
 offsets in the picker, demo detection by `plan` instead of the demo login's email).
 
-### Notifications — counts shipped with the redesign; Inbox page still to build
-**Done:** `GET /notifications` derives the counts on read, and the sidebar's Inbox button and the
-Leave/Corrections menus show them. **Left:** a real Inbox page listing everything waiting in one
-place (the Inbox button links to the first queue with items until then).
+### ~~Notifications~~ — done: counts with the redesign (PR #8), Inbox page after it
+`GET /notifications` derives the counts on read (sidebar Inbox badge, Leave/Corrections menus), and
+`GET /notifications/inbox` returns the items behind them, from the same function, so the badge and
+the page can't disagree. The `/inbox` page is one queue: your own missed clock-outs (with the
+correction form inline) and, for admins, every pending leave, correction and profile change they may
+resolve, each approvable in place. Not included: your own pending requests ("waiting on your admin")
+— they aren't counted as waiting on *you*; add them if staff ask.
 *User's #10.* Start **derived/computed**, not a persisted notification log with read/unread state —
 much less to build and it covers everything on your list (needs correction, needs approval, forgot to
 clock out) since all of that is already queryable: pending corrections/leave count (admin), own
@@ -210,9 +213,9 @@ a real persisted table later only if you need push notifications or a read/unrea
 build that up front.
 
 ### Analytics: absent/week, early-leave/week, cleaner breakdown
-*User's #11.* Two things bundled here: (1) `missed_clockout` isn't tracked in `StatusDistribution`/
-`DayStatusCounts` at all right now — I deliberately left it out of scope when I added the status to
-keep that change small, so it's silently absent from every chart. (2) You want weekly (not just
+*User's #11.* Two things bundled here: (1) ~~`missed_clockout` missing from the charts~~ — the 30-day
+status distribution and the trend's present rate count it since the redesign (PR #8); the team
+calendar's per-day counts (`DayStatusCounts`) still don't. (2) You want weekly (not just
 30-day-total) breakdowns of absent/early-leave specifically. Both are analytics_service.py + schema
 changes, no new tables.
 
@@ -287,11 +290,9 @@ discussion: single office location, or multiple? Remote/hybrid staff exemption?
 Tier 0 and Tier 1 are done, and so are the Company page and profile edits from Tier 2. Next, in this
 order:
 
-1. **Notifications** (Tier 2, ~½ day) — there are now four things that can be waiting on someone
-   (corrections, leave, profile edits, missed clock-outs) and nothing tells them. Derived on read,
-   no new table.
-2. **Analytics: `missed_clockout` + weekly breakdowns** (Tier 2, small) — `missed_clockout` is
-   missing from every chart today, so they're quietly wrong.
+1. ~~**Notifications**~~ — done (counts + Inbox page).
+2. **Analytics: weekly breakdowns** (Tier 2, small) — absent/early-leave per week, plus
+   `missed_clockout` in the team calendar's per-day counts (the 30-day charts already count it).
 3. **Tests for `analytics_service.py` and the closeout job** (from "noticed" above, small) — before
    shift times, grace periods, holidays and overtime pile more day-boundary rules onto that code.
 4. **Shift times per employee** (Tier 2, medium–large) — the biggest unlock: real late/absent
