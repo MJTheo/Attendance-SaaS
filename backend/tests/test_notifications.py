@@ -87,7 +87,8 @@ def test_notifications_route_scopes_by_role(monkeypatch):
 def test_me_includes_org_name_plan_and_timezone(monkeypatch):
     class Orgs:
         def __init__(self, client): pass
-        def get(self, org_id): return {"id": org_id, "name": "Demo Company", "plan": "demo", "timezone": "Asia/Manila"}
+        def get(self, org_id): return {"id": org_id, "name": "Demo Company", "plan": "demo", "timezone": "Asia/Manila",
+                                       "working_days": [0, 1, 2, 3, 4]}
 
     monkeypatch.setattr(auth_router, "OrganizationsRepository", Orgs)
     app = FastAPI()
@@ -97,3 +98,15 @@ def test_me_includes_org_name_plan_and_timezone(monkeypatch):
     body = TestClient(app).get("/auth/me").json()
     assert body["name"] == "staff-1" and body["role"] == "staff"
     assert (body["org_name"], body["org_plan"], body["org_timezone"]) == ("Demo Company", "demo", "Asia/Manila")
+    assert body["org_working_days"] == [0, 1, 2, 3, 4]
+
+
+def test_request_lists_flatten_requester_approver_and_record():
+    from app.repositories.corrections import CorrectionsRepository
+    from app.repositories.leave_requests import LeaveRequestsRepository
+
+    row = {"id": "c1", "requester": {"name": "Ana"}, "approver": {"name": "Ben"}, "record": {"clock_in": "2026-10-28T00:55:00Z"}}
+    assert CorrectionsRepository.flatten(row) == {
+        "id": "c1", "requested_by_name": "Ana", "approved_by_name": "Ben", "record_clock_in": "2026-10-28T00:55:00Z"}
+    pending = {"id": "l1", "requester": {"name": "Ana"}, "approver": None}
+    assert LeaveRequestsRepository.flatten(pending) == {"id": "l1", "requested_by_name": "Ana", "approved_by_name": None}

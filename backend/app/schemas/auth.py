@@ -29,3 +29,5 @@ class Me(UserProfile):
     org_name: str
     org_plan: str
     org_timezone: str
+    # Monday=0..Sunday=6 — the calendar hatches the other days as "Off".
+    org_working_days: list[int]

@@ -36,24 +36,29 @@ class CorrectionsRepository:
         # No role branching here: RLS already scopes this per caller — staff
         # see only their own requests, admins see every correction in their
         # org (see the two SELECT policies on `corrections`).
-        # `users!requested_by` disambiguates the embed: corrections has two
-        # FKs into users (requested_by, approved_by), so an unqualified
-        # `users(name)` embed would be ambiguous.
+        # `users!requested_by` / `users!approved_by` disambiguate the embeds:
+        # corrections has two FKs into users, so an unqualified `users(name)`
+        # embed would be ambiguous. The corrected record's clock_in gives
+        # request cards their date ("Wed, Oct 28").
         response = (
             self._client.table("corrections")
-            .select("*, requester:users!requested_by(name)")
+            .select("*, requester:users!requested_by(name), approver:users!approved_by(name), record:attendance_records(clock_in)")
             .order("created_at", desc=True)
             .execute()
         )
-        return self._flatten_requester_name(response.data)
+        return [self.flatten(row) for row in response.data]
 
     @staticmethod
-    def _flatten_requester_name(rows: list[dict]) -> list[dict]:
-        records = []
-        for row in rows:
-            requester = row.pop("requester", None) or {}
-            records.append({**row, "requested_by_name": requester.get("name")})
-        return records
+    def flatten(row: dict) -> dict:
+        requester = row.pop("requester", None) or {}
+        approver = row.pop("approver", None) or {}
+        record = row.pop("record", None) or {}
+        return {
+            **row,
+            "requested_by_name": requester.get("name"),
+            "approved_by_name": approver.get("name"),
+            "record_clock_in": record.get("clock_in"),
+        }
 
     def get(self, correction_id: str) -> dict | None:
         response = self._client.table("corrections").select("*").eq("id", correction_id).limit(1).execute()

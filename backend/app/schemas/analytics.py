@@ -47,6 +47,9 @@ class DayStatusCounts(BaseModel):
 class CalendarDay(BaseModel):
     date: str
     status: str | None
+    clock_in: datetime | None = None
+    clock_out: datetime | None = None
+    leave_reason: str | None = None
 
 
 class DayDetail(BaseModel):

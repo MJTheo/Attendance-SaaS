@@ -31,6 +31,9 @@ class Correction(BaseModel):
     org_id: str
     requested_by: str
     requested_by_name: str | None = None
+    approved_by_name: str | None = None
+    # When the corrected attendance record started (its day, for display).
+    record_clock_in: datetime | None = None
     approved_by: str | None
     reason: str
     old_value: dict[str, Any]

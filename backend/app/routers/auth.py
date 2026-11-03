@@ -49,4 +49,10 @@ def signup(payload: SignupRequest, current_user: CurrentUser = Depends(decode_cu
 @router.get("/me", response_model=Me)
 def get_me(profile: dict = Depends(require_profile), user_client: Client = Depends(get_user_client)):
     org = OrganizationsRepository(user_client).get(profile["org_id"])
-    return {**profile, "org_name": org["name"], "org_plan": org["plan"], "org_timezone": org["timezone"]}
+    return {
+        **profile,
+        "org_name": org["name"],
+        "org_plan": org["plan"],
+        "org_timezone": org["timezone"],
+        "org_working_days": org["working_days"],
+    }

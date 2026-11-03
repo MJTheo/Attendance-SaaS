@@ -199,21 +199,33 @@ def build_personal_calendar(
     records: list[dict], leave_requests: list[dict], start: date, end: date, tz: ZoneInfo
 ) -> list[dict]:
     """One entry per calendar day in [start, end] with a single status (or
-    null if nothing happened that day). Approved leave overrides an
+    null if nothing happened that day), plus that day's clock-in/out times
+    or, for a leave day, the leave's reason. Approved leave overrides an
     attendance-derived status for the same day — an approved leave day is
     the more authoritative statement of what that day was."""
-    status_by_day: dict[date, str] = {}
+    entry_by_day: dict[date, dict] = {}
     for record in records:
         day = _to_local_date(record["clock_in"], tz)
         if start <= day <= end:
-            status_by_day[day] = record["status"]
+            times = record["status"] != "absent"
+            entry_by_day[day] = {
+                "status": record["status"],
+                "clock_in": record["clock_in"] if times else None,
+                "clock_out": record.get("clock_out") if times else None,
+                "leave_reason": None,
+            }
 
     for day, counts in _expand_leave_days(leave_requests, start, end).items():
         for key, count in counts.items():
             if count > 0:
-                status_by_day[day] = key
+                leave = next(
+                    (l for l in leave_requests if _to_date(l["start_date"]) <= day <= _to_date(l["end_date"])), None
+                )
+                entry_by_day[day] = {"status": key, "clock_in": None, "clock_out": None,
+                                     "leave_reason": leave["reason"] if leave else None}
 
-    return [{"date": day.isoformat(), "status": status_by_day.get(day)} for day in _date_range(start, end)]
+    empty = {"status": None, "clock_in": None, "clock_out": None, "leave_reason": None}
+    return [{"date": day.isoformat(), **entry_by_day.get(day, empty)} for day in _date_range(start, end)]
 
 
 def day_detail_for_user(records: list[dict], leave_requests: list[dict], user_id: str, day: date, tz: ZoneInfo) -> dict:
