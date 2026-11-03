@@ -81,14 +81,14 @@ async function staff(browser) {
   check('staff', 'Nav is four plain links, no dropcards',
     JSON.stringify(links) === JSON.stringify(['Dashboard', 'Calendar', 'Leave', 'Corrections']) &&
       (await s.page.locator('aside nav button').count()) === 0, links.join(', '))
-  check('staff', 'Dashboard shows the clock card and streak', /Streak:/.test(await s.page.locator('main').innerText()))
+  check('staff', 'Dashboard shows the today card and streak', /Today[\s\S]*Streak/.test(await s.page.locator('main').innerText()))
   await shot(s, 'staff-dashboard')
   for (const route of ['/team', '/analytics', '/company', '/approvals/leave', '/approvals/corrections']) {
     const v = await visit(s, route)
     check('staff', `${route} redirects to the dashboard`, v.path === '/', v.path)
   }
-  for (const [route, heading] of [['/calendar', 'Calendar'], ['/requests/leave', 'Leave requests'],
-                                  ['/requests/corrections', 'Correction requests']]) {
+  for (const [route, heading] of [['/calendar', null], ['/requests/leave', 'Leave'],
+                                  ['/requests/corrections', 'Corrections']]) {
     const v = await visit(s, route, heading)
     check('staff', `${route} loads cleanly`, v.path === route && !v.problems.length, v.problems.join('; '))
   }
@@ -104,9 +104,9 @@ async function staff(browser) {
   const profileText = await s.page.locator('main').innerText()
   // live_api.py files name changes for this account, so the history must list them.
   check('staff', 'My profile shows details and request history',
-    /request a change/i.test(profileText) && /Name: .+ → /.test(profileText))
+    /request a change/i.test(profileText) && /Name change[\s\S]*→/.test(profileText))
   await shot(s, 'staff-profile')
-  await visit(s, '/calendar', 'Calendar')
+  await visit(s, '/calendar', null)
   check('staff', 'Calendar has no team view', (await s.page.locator('main button', { hasText: /^Team$/ }).count()) === 0)
   await s.context.close()
 
@@ -125,8 +125,8 @@ async function staff(browser) {
 
 async function admin(browser) {
   const s = await signIn(browser, 'ADMIN')
-  for (const [route, heading] of [['/', null], ['/calendar', 'Calendar'], ['/requests/leave', 'Leave requests'],
-                                  ['/approvals/leave', 'Leave approvals'], ['/requests/corrections', 'Correction requests'],
+  for (const [route, heading] of [['/', null], ['/calendar', null], ['/requests/leave', 'Leave'],
+                                  ['/approvals/leave', 'Leave approvals'], ['/requests/corrections', 'Corrections'],
                                   ['/approvals/corrections', 'Correction approvals'], ['/team', 'Team'],
                                   ['/analytics', 'Analytics'], ['/company', 'Company']]) {
     const v = await visit(s, route, heading)

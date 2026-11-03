@@ -188,7 +188,9 @@ Plex Mono, an icon per status, the persistent shell (sidebar stays mounted, in-p
 fixes the full-screen "Loading…" flash), the Inbox button and counts, and the sign-in/sign-up/
 onboarding/invite screens; **(2) everyday screens** — Dashboard (today timeline, week-grouped
 history), Calendar, my leave/corrections, Profile; **(3) admin screens** — approvals, Team as tabs,
-Analytics, Company. `CLAUDE.md`'s design language now describes B.
+Analytics, Company. `CLAUDE.md`'s design language now describes B. PR 2 also extends `/auth/me` with
+the org's working days and the personal calendar with each day's times/leave reason, and adds the
+approver name and corrected record's date to the request lists.
 
 ### Notifications — counts shipped with the redesign; Inbox page still to build
 **Done:** `GET /notifications` derives the counts on read, and the sidebar's Inbox button and the
