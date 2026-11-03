@@ -146,13 +146,13 @@ async function admin(browser) {
     await s.page.click('aside nav a:has-text("Approvals")')
     await s.page.waitForSelector(`h1:has-text("${heading}")`)
     const cls = await s.page.locator(`aside nav button:has-text("${label}")`).getAttribute('class')
-    check('admin', `${label} dropcard navigates and stays highlighted`, /text-status-good/.test(cls || ''))
+    check('admin', `${label} menu navigates and stays highlighted`, /font-semibold/.test(cls || ''))
   }
   const before = await s.page.evaluate(() => document.documentElement.getAttribute('data-theme'))
-  await s.page.locator('aside button[title^="Switch to"]').first().click()
+  await s.page.locator('aside button:has-text(" theme")').first().click()
   const after = await s.page.evaluate(() => document.documentElement.getAttribute('data-theme'))
   check('admin', 'Theme toggle switches theme', before !== after, `${before} -> ${after}`)
-  await s.page.locator('aside button[title^="Switch to"]').first().click()
+  await s.page.locator('aside button:has-text(" theme")').first().click()
   await s.context.close()
 }
 

@@ -179,7 +179,21 @@ change against the free tier's rate limit. **Applied and live-tested** (migratio
 `20261102100000_profile_edit_requests.sql`), except one real email change end to end — see open
 follow-ups at the top.
 
-### Notifications
+### Redesign to direction B — in progress (three PRs)
+Claude Design round of 2026-11-02 produced three directions; **B, "warm graphite ledger"**, was
+chosen and is fully specified for every screen at desktop and 390px
+([canvas](https://claude.ai/code/artifact/0eff596e-9201-481b-bbcb-f412c4fbd55a), page "B — full
+design"). Delivered in three PRs: **(1) foundation** — tokens (light default), Instrument Sans + IBM
+Plex Mono, an icon per status, the persistent shell (sidebar stays mounted, in-place skeletons —
+fixes the full-screen "Loading…" flash), the Inbox button and counts, and the sign-in/sign-up/
+onboarding/invite screens; **(2) everyday screens** — Dashboard (today timeline, week-grouped
+history), Calendar, my leave/corrections, Profile; **(3) admin screens** — approvals, Team as tabs,
+Analytics, Company. `CLAUDE.md`'s design language now describes B.
+
+### Notifications — counts shipped with the redesign; Inbox page still to build
+**Done:** `GET /notifications` derives the counts on read, and the sidebar's Inbox button and the
+Leave/Corrections menus show them. **Left:** a real Inbox page listing everything waiting in one
+place (the Inbox button links to the first queue with items until then).
 *User's #10.* Start **derived/computed**, not a persisted notification log with read/unread state —
 much less to build and it covers everything on your list (needs correction, needs approval, forgot to
 clock out) since all of that is already queryable: pending corrections/leave count (admin), own
