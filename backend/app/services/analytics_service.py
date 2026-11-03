@@ -176,8 +176,23 @@ def daily_trend(records: list[dict], leave_requests: list[dict], start: date, en
         entry.update(per_day_attendance.get(day, {}))
         for key, count in leave_days.get(day, {}).items():
             entry[key] += count
+        entry["present_rate"] = present_rate(entry)
         out.append(entry)
     return out
+
+
+ATTENDED_STATUS_KEYS = ("present", "late", "early_leave", "missed_clockout")
+
+
+def present_rate(day_counts: dict) -> float | None:
+    """Share of the people with a status that day who actually clocked in
+    (late, left early or forgot to clock out still count as in); absent and
+    on-leave count against it. None for a day with nothing recorded — a
+    non-working day, or one before the org started — so the trend skips it
+    rather than plotting a 0%."""
+    attended = sum(day_counts.get(k, 0) for k in ATTENDED_STATUS_KEYS)
+    recorded = attended + sum(day_counts.get(k, 0) for k in ("absent", *LEAVE_STATUS_KEYS))
+    return round(attended / recorded, 3) if recorded else None
 
 
 def status_distribution(records: list[dict], leave_requests: list[dict], start: date, end: date, tz: ZoneInfo) -> dict:
