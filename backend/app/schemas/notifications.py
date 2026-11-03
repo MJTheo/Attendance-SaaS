@@ -1,5 +1,10 @@
 from pydantic import BaseModel
 
+from app.schemas.attendance import AttendanceRecord
+from app.schemas.corrections import Correction
+from app.schemas.leave import LeaveRequest
+from app.schemas.profile import ProfileEditRequest
+
 
 class Notifications(BaseModel):
     # Approval queues waiting on the caller (admins only; always 0 for staff).
@@ -10,3 +15,12 @@ class Notifications(BaseModel):
     # filed yet — anyone can have these.
     missed_clockouts: int
     total: int
+
+
+class Inbox(BaseModel):
+    """The items behind the counts above, oldest first."""
+
+    leave: list[LeaveRequest]
+    corrections: list[Correction]
+    profile_changes: list[ProfileEditRequest]
+    missed_clockouts: list[AttendanceRecord]
