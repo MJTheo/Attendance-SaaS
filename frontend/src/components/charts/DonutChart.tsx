@@ -1,64 +1,53 @@
-const SIZE = 140
-const STROKE = 20
-const RADIUS = (SIZE - STROKE) / 2
-const CIRCUMFERENCE = 2 * Math.PI * RADIUS
+import { StatusIcon, formatStatusLabel } from '../StatusDot'
 
 export interface DonutSegment {
-  label: string
+  status: string
   value: number
+  // A status colour token, e.g. var(--color-status-good)
   color: string
 }
 
+// Status mix as a ring (design B) with the list beside it: each status's
+// icon, label, count and share — so the ring is never read by colour alone.
 export function DonutChart({ segments }: { segments: DonutSegment[] }) {
   const total = segments.reduce((sum, s) => sum + s.value, 0)
+  const pct = (v: number) => (total ? Math.round((v / total) * 100) : 0)
 
-  if (total === 0) {
-    return <p className="font-mono text-sm text-text-muted">No data yet.</p>
-  }
-
-  let offset = 0
-  const arcs = segments
+  let acc = 0
+  const stops = segments
     .filter((s) => s.value > 0)
     .map((s) => {
-      const fraction = s.value / total
-      const dash = fraction * CIRCUMFERENCE
-      const arc = { ...s, dash, offset }
-      offset += dash
-      return arc
+      const from = acc
+      acc += (s.value / total) * 100
+      return `${s.color} ${from.toFixed(2)}% ${acc.toFixed(2)}%`
     })
+  const ring = stops.length ? `conic-gradient(${stops.join(', ')})` : 'var(--color-surface-raised)'
 
   return (
-    <div className="flex flex-wrap items-center gap-6">
-      <svg viewBox={`0 0 ${SIZE} ${SIZE}`} width={SIZE} height={SIZE} role="img" aria-label="Status distribution">
-        <g transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}>
-          <circle cx={SIZE / 2} cy={SIZE / 2} r={RADIUS} fill="none" stroke="var(--color-border)" strokeWidth={STROKE} />
-          {arcs.map((arc) => (
-            <circle
-              key={arc.label}
-              cx={SIZE / 2}
-              cy={SIZE / 2}
-              r={RADIUS}
-              fill="none"
-              stroke={arc.color}
-              strokeWidth={STROKE}
-              strokeDasharray={`${arc.dash} ${CIRCUMFERENCE - arc.dash}`}
-              strokeDashoffset={-arc.offset}
-            />
-          ))}
-        </g>
-      </svg>
-      <div className="flex flex-col gap-1.5 font-mono text-xs text-text-muted">
-        {segments
-          .filter((s) => s.value > 0)
-          .map((s) => (
-            <span key={s.label} className="flex items-center gap-1.5">
-              <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} aria-hidden="true" />
-              <span className="text-text">{s.label}</span>
-              <span>
-                {s.value} ({Math.round((s.value / total) * 100)}%)
-              </span>
-            </span>
-          ))}
+    <div className="flex flex-wrap items-center gap-[22px]">
+      <div
+        role="img"
+        aria-label={`Status distribution: ${segments
+          .filter((s) => s.value)
+          .map((s) => `${formatStatusLabel(s.status)} ${pct(s.value)}%`)
+          .join(', ') || 'no records'}`}
+        className="flex h-40 w-40 flex-none items-center justify-center rounded-full"
+        style={{ background: ring }}
+      >
+        <div className="flex h-[104px] w-[104px] flex-col items-center justify-center rounded-full bg-surface">
+          <span className="font-mono text-[22px] font-medium">{total}</span>
+          <span className="text-xs text-text-muted">records</span>
+        </div>
+      </div>
+      <div className="flex flex-[1_1_180px] flex-col gap-1.5">
+        {segments.map((s) => (
+          <div key={s.status} className="grid grid-cols-[16px_minmax(0,1fr)_auto_auto] items-center gap-2 text-[13px]">
+            <StatusIcon status={s.status} />
+            <span>{formatStatusLabel(s.status)}</span>
+            <span className="font-mono text-text-muted">{s.value}</span>
+            <span className="w-11 text-right font-mono">{pct(s.value)}%</span>
+          </div>
+        ))}
       </div>
     </div>
   )

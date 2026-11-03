@@ -32,6 +32,7 @@ class StatusDistribution(BaseModel):
     absent: int
     sick_leave: int
     annual_leave: int
+    missed_clockout: int = 0
 
 
 class DayStatusCounts(BaseModel):
@@ -42,11 +43,15 @@ class DayStatusCounts(BaseModel):
     absent: int
     sick_leave: int
     annual_leave: int
+    present_rate: float | None = None
 
 
 class CalendarDay(BaseModel):
     date: str
     status: str | None
+    clock_in: datetime | None = None
+    clock_out: datetime | None = None
+    leave_reason: str | None = None
 
 
 class DayDetail(BaseModel):

@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from supabase import Client
 
 from app.config import get_settings
 from app.core.security import CurrentUser, decode_current_user
-from app.dependencies import get_service_role_client, require_profile
+from app.dependencies import get_service_role_client, get_user_client, require_profile
+from app.repositories.organizations import OrganizationsRepository
 from app.repositories.users import UsersRepository
-from app.schemas.auth import SignupRequest, UserProfile
+from app.schemas.auth import Me, SignupRequest, UserProfile
 from app.services.auth_service import (
     AuthService,
     InvalidAccessCodeError,
@@ -44,6 +46,13 @@ def signup(payload: SignupRequest, current_user: CurrentUser = Depends(decode_cu
     return profile
 
 
-@router.get("/me", response_model=UserProfile)
-def get_me(profile: dict = Depends(require_profile)):
-    return profile
+@router.get("/me", response_model=Me)
+def get_me(profile: dict = Depends(require_profile), user_client: Client = Depends(get_user_client)):
+    org = OrganizationsRepository(user_client).get(profile["org_id"])
+    return {
+        **profile,
+        "org_name": org["name"],
+        "org_plan": org["plan"],
+        "org_timezone": org["timezone"],
+        "org_working_days": org["working_days"],
+    }

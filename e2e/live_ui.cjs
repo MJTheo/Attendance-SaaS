@@ -81,14 +81,14 @@ async function staff(browser) {
   check('staff', 'Nav is four plain links, no dropcards',
     JSON.stringify(links) === JSON.stringify(['Dashboard', 'Calendar', 'Leave', 'Corrections']) &&
       (await s.page.locator('aside nav button').count()) === 0, links.join(', '))
-  check('staff', 'Dashboard shows the clock card and streak', /Streak:/.test(await s.page.locator('main').innerText()))
+  check('staff', 'Dashboard shows the today card and streak', /Today[\s\S]*Streak/.test(await s.page.locator('main').innerText()))
   await shot(s, 'staff-dashboard')
   for (const route of ['/team', '/analytics', '/company', '/approvals/leave', '/approvals/corrections']) {
     const v = await visit(s, route)
     check('staff', `${route} redirects to the dashboard`, v.path === '/', v.path)
   }
-  for (const [route, heading] of [['/calendar', 'Calendar'], ['/requests/leave', 'Leave requests'],
-                                  ['/requests/corrections', 'Correction requests']]) {
+  for (const [route, heading] of [['/calendar', null], ['/requests/leave', 'Leave'],
+                                  ['/requests/corrections', 'Corrections']]) {
     const v = await visit(s, route, heading)
     check('staff', `${route} loads cleanly`, v.path === route && !v.problems.length, v.problems.join('; '))
   }
@@ -104,9 +104,9 @@ async function staff(browser) {
   const profileText = await s.page.locator('main').innerText()
   // live_api.py files name changes for this account, so the history must list them.
   check('staff', 'My profile shows details and request history',
-    /request a change/i.test(profileText) && /Name: .+ → /.test(profileText))
+    /request a change/i.test(profileText) && /Name change[\s\S]*→/.test(profileText))
   await shot(s, 'staff-profile')
-  await visit(s, '/calendar', 'Calendar')
+  await visit(s, '/calendar', null)
   check('staff', 'Calendar has no team view', (await s.page.locator('main button', { hasText: /^Team$/ }).count()) === 0)
   await s.context.close()
 
@@ -125,8 +125,8 @@ async function staff(browser) {
 
 async function admin(browser) {
   const s = await signIn(browser, 'ADMIN')
-  for (const [route, heading] of [['/', null], ['/calendar', 'Calendar'], ['/requests/leave', 'Leave requests'],
-                                  ['/approvals/leave', 'Leave approvals'], ['/requests/corrections', 'Correction requests'],
+  for (const [route, heading] of [['/', null], ['/calendar', null], ['/requests/leave', 'Leave'],
+                                  ['/approvals/leave', 'Leave approvals'], ['/requests/corrections', 'Corrections'],
                                   ['/approvals/corrections', 'Correction approvals'], ['/team', 'Team'],
                                   ['/analytics', 'Analytics'], ['/company', 'Company']]) {
     const v = await visit(s, route, heading)
@@ -134,11 +134,13 @@ async function admin(browser) {
   }
   await visit(s, '/company', 'Company')
   check('admin', 'Company: no Rename button', (await s.page.locator('button', { hasText: 'Rename' }).count()) === 0)
-  check('admin', 'Company: working days editable', (await s.page.locator('button[title="Monday"]').count()) === 1)
+  check('admin', 'Company: working days editable', await s.page.locator('button[aria-label="Monday"]').isEnabled())
   await shot(s, 'admin-company')
   await visit(s, '/team', 'Team')
-  check('admin', 'Team: roles table hidden', (await s.page.locator('text=Team roles').count()) === 0)
-  check('admin', 'Team: profile change queue shown', (await s.page.locator('h2:has-text("Profile change requests")').count()) === 1)
+  check('admin', 'Team: Roles tab hidden', (await s.page.locator('[role=tab]:has-text("Roles")').count()) === 0)
+  await s.page.click('[role=tab]:has-text("Requests")')
+  check('admin', 'Team: profile change queue shown',
+    await s.page.waitForSelector('h2:has-text("Profile changes waiting")', { timeout: 15000 }).then(() => true, () => false))
   check('admin', 'Team: no org settings left on this page', (await s.page.locator('text=Organization settings').count()) === 0)
   await visit(s, '/')
   for (const [label, heading] of [['Leave', 'Leave approvals'], ['Corrections', 'Correction approvals']]) {
@@ -146,36 +148,37 @@ async function admin(browser) {
     await s.page.click('aside nav a:has-text("Approvals")')
     await s.page.waitForSelector(`h1:has-text("${heading}")`)
     const cls = await s.page.locator(`aside nav button:has-text("${label}")`).getAttribute('class')
-    check('admin', `${label} dropcard navigates and stays highlighted`, /text-status-good/.test(cls || ''))
+    check('admin', `${label} menu navigates and stays highlighted`, /font-semibold/.test(cls || ''))
   }
   const before = await s.page.evaluate(() => document.documentElement.getAttribute('data-theme'))
-  await s.page.locator('aside button[title^="Switch to"]').first().click()
+  await s.page.locator('aside button:has-text(" theme")').first().click()
   const after = await s.page.evaluate(() => document.documentElement.getAttribute('data-theme'))
   check('admin', 'Theme toggle switches theme', before !== after, `${before} -> ${after}`)
-  await s.page.locator('aside button[title^="Switch to"]').first().click()
+  await s.page.locator('aside button:has-text(" theme")').first().click()
   await s.context.close()
 }
 
 async function superAdmin(browser) {
   const s = await signIn(browser, 'SUPERADMIN')
   await visit(s, '/company', 'Company')
-  const name = (await s.page.locator('main section').first().locator('p').first().innerText()).trim()
+  const name = (await s.page.locator('#org-heading').innerText()).trim()
   check('super', 'Company: Rename button shown', (await s.page.locator('button', { hasText: 'Rename' }).count()) === 1)
   await s.page.click('button:has-text("Rename")')
-  await s.page.fill('main form input', `${name} (renamed)`)
-  await s.page.click('button:has-text("Save")')
+  await s.page.fill('#org-name', `${name} (renamed)`)
+  await s.page.click('button:has-text("Save name")')
   await s.page.waitForSelector(`text=${name} (renamed)`)
   await s.page.click('button:has-text("Rename")')
-  await s.page.fill('main form input', name)
-  await s.page.click('button:has-text("Save")')
-  await s.page.waitForFunction((n) => !document.querySelector('main form') && document.body.innerText.includes(n), name)
+  await s.page.fill('#org-name', name)
+  await s.page.click('button:has-text("Save name")')
+  await s.page.waitForFunction((n) => !document.querySelector('#org-name') && document.body.innerText.includes(n), name)
   check('super', 'Rename through the UI and back', true, name)
   await shot(s, 'super-company')
   await visit(s, '/team', 'Team')
-  const rows = await s.page.locator('section:has-text("Team roles") tbody tr').count()
-  check('super', 'Team roles table lists the members', rows >= 3, `${rows} rows`)
-  const own = s.page.locator('section:has-text("Team roles") tbody tr', { hasText: '(you)' }).locator('select')
-  check('super', 'Own role selector is locked', (await own.count()) === 0 || (await own.isDisabled()))
+  await s.page.click('[role=tab]:has-text("Roles")')
+  await s.page.waitForSelector('section[aria-label="Team roles"]')
+  const selects = await s.page.locator('section[aria-label="Team roles"] select[aria-label^="Role for"]').count()
+  check('super', 'Team roles list the other members', selects >= 2, `${selects} selectors`)
+  check('super', 'Own role selector is locked', (await s.page.locator('text=Your own role is locked').count()) === 1)
   await shot(s, 'super-team')
   const v = await visit(s, '/analytics', 'Analytics')
   check('super', 'Analytics loads cleanly', !v.problems.length, v.problems.join('; '))
@@ -193,7 +196,7 @@ async function publicDemo(browser) {
   check('demo', 'Public demo login reaches the app', v.path === '/company' && !v.problems.length, v.problems.join('; '))
   check('demo', 'Demo org is read-only for rename and settings',
     /demo/.test(text) && (await s.page.locator('button', { hasText: 'Rename' }).count()) === 0 &&
-      (await s.page.locator('button[title="Monday"]').count()) === 0)
+      (await s.page.locator('button[aria-label="Monday"]').isDisabled()))
   await s.context.close()
 }
 

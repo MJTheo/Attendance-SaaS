@@ -51,13 +51,14 @@ Work through these in order. Do not start a phase before the previous one is dep
 
 ## Design language
 
-Dark "systems dashboard" aesthetic, consistent with the owner's existing portfolio:
+Direction B, "warm graphite ledger" — chosen from the Claude Design round of 2026-11-02 (canvas: https://claude.ai/code/artifact/0eff596e-9201-481b-bbcb-f412c4fbd55a, page "B — full design"; it is the visual spec for every screen). Tokens live in `frontend/src/index.css`.
 
-- Status communicated via colored dots — teal (good/present), amber (warning/late), slate (neutral/inactive), sky (sick leave), violet (annual leave). The palette grew from 3 to 5 colors when leave types were added; a calendar with 6 status types needs that to stay readable, but keep new colors this deliberate and documented rather than adding one per feature.
-- JetBrains Mono for data, timestamps, and numeric fields
-- Space Grotesk for headings
-- Dense, information-first layouts — this is an ops tool, not a marketing site
-- Left sidebar nav (not a top bar) — collapses to a slide-in drawer on mobile via a hamburger toggle. Nav items that combine "my requests" with "approvals" (Leave, Corrections) render as a dropcard for admins/super admins (there are two places to go); staff only ever have one place to go, so they get a plain link instead of a pointless one-item menu.
+- Warm paper/graphite neutrals. **Light is the default theme**; dark is opt-in and remembered per browser. Primary actions are filled graphite on light, paper on dark.
+- **Status colour is the only colour in the data**: five meaning groups — good (present, approved), warning (late, early leave, missed clock-out, pending), neutral (absent, rejected), sick leave, annual leave. Every status is a tinted pill with **its own icon and its label** (`components/StatusDot.tsx`), never colour alone — that's what keeps the three warning states apart and colour-blind safe. Keep new colours this deliberate and documented rather than adding one per feature.
+- **Vermilion is a signal, never a status**: the brand mark, unread counts (Inbox) and errors only.
+- Instrument Sans for UI and headings; IBM Plex Mono for data, timestamps and numeric fields.
+- Borderless cards (16px radius), 10px controls, 44px touch targets on mobile. Dense, information-first layouts — this is an ops tool, not a marketing site.
+- Left sidebar nav (not a top bar), grouped "You" / "Manage", with an Inbox button whose count comes from `GET /notifications`. The shell stays mounted across pages; pages show in-place skeletons while loading. On mobile the sidebar becomes a slide-in drawer behind a hamburger in a 58px top bar. Nav items that combine "my requests" with "approvals" (Leave, Corrections) open a small menu for admins/super admins (there are two places to go, with the queue's count); staff only ever have one place to go, so they get a plain link instead of a pointless one-item menu.
 
 ## Working preferences
 

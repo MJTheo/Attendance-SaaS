@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
-import { api, isAdmin, type Organization, type Role, type UserProfile, type Weekday } from '../lib/api'
-import { DEMO_ADMIN_EMAIL } from '../lib/demo'
-import { AppShell } from '../components/AppShell'
+import { api, isAdmin, type Organization, type Weekday } from '../lib/api'
+import { useMe } from '../lib/me-context'
+import { Page } from '../components/Page'
+import { LoadError, Skeleton } from '../components/Skeleton'
+import { StatusIcon } from '../components/StatusDot'
 
 const WEEKDAYS: { value: Weekday; short: string; full: string }[] = [
   { value: 0, short: 'Mon', full: 'Monday' },
@@ -14,290 +16,308 @@ const WEEKDAYS: { value: Weekday; short: string; full: string }[] = [
   { value: 6, short: 'Sun', full: 'Sunday' },
 ]
 
-function describeWorkingDays(days: number[]): string {
-  const set = new Set(days)
-  return WEEKDAYS.filter((d) => set.has(d.value))
-    .map((d) => d.full)
-    .join(', ')
-}
-
 // IANA zone names, from the browser itself — avoids shipping/maintaining a
 // static list. Falls back to a small curated set on older browsers without
 // Intl.supportedValuesOf (Safari < 17, e.g.).
 const TIMEZONES: string[] =
   typeof Intl.supportedValuesOf === 'function'
     ? Intl.supportedValuesOf('timeZone')
-    : [
-        'UTC',
-        'America/New_York',
-        'America/Los_Angeles',
-        'Europe/London',
-        'Europe/Berlin',
-        'Asia/Manila',
-        'Asia/Tokyo',
-        'Asia/Kolkata',
-        'Australia/Sydney',
-      ]
+    : ['UTC', 'America/New_York', 'America/Los_Angeles', 'Europe/London', 'Europe/Berlin', 'Asia/Manila', 'Asia/Tokyo', 'Asia/Kolkata', 'Australia/Sydney']
 
-const HEADCOUNT_ROLES: { role: Role; label: string }[] = [
-  { role: 'staff', label: 'Staff' },
-  { role: 'admin', label: 'Admin' },
-  { role: 'super_admin', label: 'Super admin' },
-]
-
-function formatDate(value: string): string {
-  return new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+// "Asia/Manila (UTC+8)" — the zone's offset right now.
+function timezoneLabel(tz: string): string {
+  try {
+    const name = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'shortOffset' })
+      .formatToParts(new Date())
+      .find((p) => p.type === 'timeZoneName')?.value
+    return name ? `${tz} (${name.replace('GMT', 'UTC').replace(/^UTC$/, 'UTC+0')})` : tz
+  } catch {
+    return tz
+  }
 }
 
-const LABEL_CLASS = 'mb-1 block font-mono text-xs uppercase tracking-wide text-text-muted'
-const SECTION_CLASS = 'mb-8 rounded-lg border border-border bg-surface p-4 sm:p-6'
-const SECTION_HEADING_CLASS = 'mb-3 font-sans text-sm font-semibold uppercase tracking-wide text-text-muted'
+function sameDays(a: Weekday[], b: Weekday[]): boolean {
+  return a.length === b.length && a.every((d, i) => d === b[i])
+}
+
+const LOCK_ICON = 'M6 11h12v10H6zM8 11V7a4 4 0 0 1 8 0v4'
 
 export function Company() {
-  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const { me, refreshMe } = useMe()
+  const isDemo = me.org_plan === 'demo'
   const [org, setOrg] = useState<Organization | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [savingSettings, setSavingSettings] = useState(false)
-  const [editingName, setEditingName] = useState(false)
-  const [nameDraft, setNameDraft] = useState('')
-  const [savingName, setSavingName] = useState(false)
-  const [nameError, setNameError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    setLoading(true)
+    setError(null)
     try {
-      const me = await api.me()
-      setProfile(me)
-      if (!isAdmin(me)) return
       setOrg(await api.organization())
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load')
     } finally {
-      setLoading(false)
+      setLoaded(true)
     }
   }, [])
 
   useEffect(() => {
-    load()
-  }, [load])
+    if (isAdmin(me)) load()
+  }, [me, load])
 
-  async function handleWorkingDayToggle(day: Weekday) {
-    if (!org) return
-    const set = new Set(org.working_days)
-    if (set.has(day)) {
-      set.delete(day)
-    } else {
-      set.add(day)
-    }
-    const workingDays = [...set].sort((a, b) => a - b) as Weekday[]
-    setError(null)
-    setSavingSettings(true)
-    try {
-      const updated = await api.updateOrgSettings({ working_days: workingDays })
-      setOrg((current) => (current ? { ...current, ...updated } : current))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update settings')
-    } finally {
-      setSavingSettings(false)
-    }
-  }
+  if (!isAdmin(me)) return <Navigate to="/" replace />
 
-  async function handleTimezoneChange(timezone: string) {
-    setError(null)
-    setSavingSettings(true)
-    try {
-      const updated = await api.updateOrgSettings({ timezone })
-      setOrg((current) => (current ? { ...current, ...updated } : current))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update settings')
-    } finally {
-      setSavingSettings(false)
-    }
-  }
+  return (
+    <Page title="Company" sub="Organization settings" maxWidth={900} demo={isDemo}>
+      {!loaded ? (
+        <Skeleton />
+      ) : error || !org ? (
+        <LoadError message={error ?? undefined} onRetry={load} />
+      ) : (
+        <div className="flex flex-col gap-[18px]">
+          <OrgCard
+            org={org}
+            // Rename is super-admin-only (enforced by the API and a DB trigger too).
+            canRename={me.role === 'super_admin' && !isDemo}
+            lockText={isDemo ? 'Read-only in the demo' : me.role !== 'super_admin' ? 'Only a super admin can rename the org' : null}
+            onRenamed={(updated) => {
+              setOrg(updated)
+              refreshMe()
+            }}
+          />
+          <SettingsCard
+            org={org}
+            readOnly={isDemo}
+            onSaved={(updated) => {
+              setOrg((current) => (current ? { ...current, ...updated } : current))
+              // "Today", the calendar and the sidebar all follow these.
+              refreshMe()
+            }}
+          />
+        </div>
+      )}
+    </Page>
+  )
+}
 
-  function startEditingName() {
-    if (!org) return
-    setNameDraft(org.name)
-    setNameError(null)
-    setEditingName(true)
-  }
+function OrgCard({
+  org,
+  canRename,
+  lockText,
+  onRenamed,
+}: {
+  org: Organization
+  canRename: boolean
+  lockText: string | null
+  onRenamed: (org: Organization) => void
+}) {
+  const [renaming, setRenaming] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   async function handleRename(event: FormEvent) {
     event.preventDefault()
-    setNameError(null)
-    setSavingName(true)
+    setError(null)
+    setSaving(true)
     try {
-      setOrg(await api.renameOrganization(nameDraft))
-      setEditingName(false)
+      onRenamed(await api.renameOrganization(draft))
+      setRenaming(false)
     } catch (err) {
-      setNameError(err instanceof Error ? err.message : 'Failed to rename organization')
+      setError(err instanceof Error ? err.message : 'Failed to rename the organization')
     } finally {
-      setSavingName(false)
+      setSaving(false)
     }
   }
 
-  if (loading && !profile) {
-    return <div className="flex min-h-screen items-center justify-center text-text-muted">Loading…</div>
-  }
-
-  if (!profile) {
-    return <div className="flex min-h-screen items-center justify-center text-text-muted">Something went wrong.</div>
-  }
-
-  if (!isAdmin(profile)) {
-    return <Navigate to="/" replace />
-  }
-
-  const isDemo = profile.email === DEMO_ADMIN_EMAIL
-  // Rename is super-admin-only (enforced by the API and a DB trigger too);
-  // working days/timezone stay editable by any admin.
-  const canRename = profile.role === 'super_admin' && !isDemo
+  const created = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(org.created_at))
+  const plan = `${org.plan.charAt(0).toUpperCase()}${org.plan.slice(1)} plan`
+  const heads = [
+    { n: org.member_counts.super_admin, label: 'Super admin' },
+    { n: org.member_counts.admin, label: 'Admins' },
+    { n: org.member_counts.staff, label: 'Staff' },
+  ]
 
   return (
-    <AppShell profile={profile}>
-      <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
-        <h1 className="mb-4 font-sans text-lg font-semibold text-text">Company</h1>
-
-        {error && <p className="mb-4 font-mono text-sm text-status-warning">{error}</p>}
-
-        {org && (
-          <>
-            <section className={SECTION_CLASS}>
-              <h2 className={SECTION_HEADING_CLASS}>Organization</h2>
-
-              <span className={LABEL_CLASS}>Name</span>
-              {editingName ? (
-                <form onSubmit={handleRename} className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <input
-                    value={nameDraft}
-                    onChange={(e) => setNameDraft(e.target.value)}
-                    maxLength={100}
-                    required
-                    autoFocus
-                    disabled={savingName}
-                    className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-status-good disabled:opacity-50 sm:max-w-sm"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      type="submit"
-                      disabled={savingName || !nameDraft.trim()}
-                      className="rounded-md border border-status-good bg-status-good px-3 py-1.5 font-mono text-xs text-bg disabled:opacity-50"
-                    >
-                      {savingName ? 'Saving…' : 'Save'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditingName(false)}
-                      disabled={savingName}
-                      className="rounded-md border border-border px-3 py-1.5 font-mono text-xs text-text-muted hover:text-text disabled:opacity-50"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <div className="flex items-center gap-3">
-                  <p className="font-sans text-base font-semibold text-text">{org.name}</p>
-                  {canRename && (
-                    <button
-                      type="button"
-                      onClick={startEditingName}
-                      className="rounded-md border border-border px-2 py-0.5 font-mono text-xs text-text-muted hover:text-text"
-                    >
-                      Rename
-                    </button>
-                  )}
-                </div>
-              )}
-              {nameError && <p className="mt-2 font-mono text-xs text-status-warning">{nameError}</p>}
-
-              <dl className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <div>
-                  <dt className={LABEL_CLASS}>Plan</dt>
-                  {/* Bordered pill, not a StatusDot color — plan isn't attendance status. */}
-                  <dd>
-                    <span className="rounded-full border border-border px-2 py-0.5 font-mono text-xs text-text">
-                      {org.plan}
-                    </span>
-                  </dd>
-                </div>
-                <div>
-                  <dt className={LABEL_CLASS}>Created</dt>
-                  <dd className="font-mono text-sm text-text">{formatDate(org.created_at)}</dd>
-                </div>
-                <div>
-                  <dt className={LABEL_CLASS}>Headcount</dt>
-                  <dd className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-sm text-text">
-                    {HEADCOUNT_ROLES.map(({ role, label }) => (
-                      <span key={role}>
-                        {org.member_counts[role]} <span className="text-text-muted">{label.toLowerCase()}</span>
-                      </span>
-                    ))}
-                  </dd>
-                </div>
-              </dl>
-            </section>
-
-            <section className={SECTION_CLASS}>
-              <h2 className={SECTION_HEADING_CLASS}>Settings</h2>
-              <span className={LABEL_CLASS}>Working days</span>
-              {!isDemo ? (
-                <div className="flex flex-wrap gap-1.5">
-                  {WEEKDAYS.map((day) => {
-                    const active = org.working_days.includes(day.value)
-                    return (
-                      <button
-                        key={day.value}
-                        type="button"
-                        onClick={() => handleWorkingDayToggle(day.value)}
-                        disabled={savingSettings}
-                        aria-pressed={active}
-                        title={day.full}
-                        className={`w-14 rounded-md border px-2 py-1.5 font-mono text-xs disabled:opacity-50 ${
-                          active
-                            ? 'border-status-good bg-status-good text-bg'
-                            : 'border-border text-text-muted hover:text-text'
-                        }`}
-                      >
-                        {day.short}
-                      </button>
-                    )
-                  })}
-                </div>
-              ) : (
-                <p className="font-mono text-sm text-text">{describeWorkingDays(org.working_days)}</p>
-              )}
-              <p className="mt-2 font-mono text-xs text-text-muted">
-                Controls which weekdays show up in analytics and which days count toward streaks.
-              </p>
-
-              <span className={`${LABEL_CLASS} mt-4`}>Timezone</span>
-              {!isDemo ? (
-                <select
-                  value={org.timezone}
-                  onChange={(e) => handleTimezoneChange(e.target.value)}
-                  disabled={savingSettings}
-                  className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-status-good disabled:opacity-50 sm:w-auto"
-                >
-                  {!TIMEZONES.includes(org.timezone) && <option value={org.timezone}>{org.timezone}</option>}
-                  {TIMEZONES.map((tz) => (
-                    <option key={tz} value={tz}>
-                      {tz}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <p className="font-mono text-sm text-text">{org.timezone}</p>
-              )}
-              <p className="mt-2 font-mono text-xs text-text-muted">
-                Defines what "today" means for clock-in caps, streaks, and the daily closeout job — not
-                each viewer's own device timezone.
-              </p>
-            </section>
-          </>
+    <section aria-labelledby="org-heading" className="flex flex-col gap-4 rounded-[16px] bg-surface p-5 sm:px-7 sm:py-6">
+      <div className="flex flex-wrap items-start justify-between gap-3.5">
+        <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-1.5">
+          <span className="text-[13px] text-text-muted">Organization name</span>
+          {renaming ? (
+            <form onSubmit={handleRename} className="flex flex-wrap gap-2">
+              <label htmlFor="org-name" className="sr-only">
+                Organization name
+              </label>
+              <input
+                id="org-name"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                maxLength={100}
+                required
+                autoFocus
+                disabled={saving}
+                className="h-12 min-w-0 flex-[1_1_280px] rounded-[10px] border border-text bg-bg px-3.5 text-base text-text shadow-[0_0_0_3px_var(--color-ring)] outline-none"
+              />
+              <button type="button" onClick={() => setRenaming(false)} disabled={saving} className="h-12 rounded-[10px] bg-surface-raised px-4">
+                Cancel
+              </button>
+              <button type="submit" disabled={saving || !draft.trim()} className="h-12 rounded-[10px] bg-action px-5 font-semibold text-on-action disabled:opacity-60">
+                {saving ? 'Saving…' : 'Save name'}
+              </button>
+            </form>
+          ) : (
+            <h2 id="org-heading" className="m-0 text-2xl font-semibold tracking-[-0.01em] [overflow-wrap:anywhere]">
+              {org.name}
+            </h2>
+          )}
+          {error && (
+            <p role="alert" className="m-0 text-[13px] text-error">
+              {error}
+            </p>
+          )}
+          <span className="flex flex-wrap items-center gap-2.5 text-[13px] text-text-muted">
+            <span className="inline-flex h-6 items-center rounded-xl border border-dashed border-border-strong px-2.5 text-text">{plan}</span>
+            <span className="font-mono text-xs">Created {created}</span>
+          </span>
+        </div>
+        {canRename && !renaming && (
+          <button
+            type="button"
+            onClick={() => {
+              setDraft(org.name)
+              setError(null)
+              setRenaming(true)
+            }}
+            className="h-11 rounded-[10px] bg-surface-raised px-4"
+          >
+            Rename
+          </button>
         )}
-      </main>
-    </AppShell>
+        {lockText && (
+          <span className="inline-flex items-center gap-1.5 text-[13px] text-text-muted">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d={LOCK_ICON} />
+            </svg>
+            {lockText}
+          </span>
+        )}
+      </div>
+      <div className="grid grid-cols-3 gap-2.5">
+        {heads.map((h) => (
+          <div key={h.label} className="flex flex-col gap-0.5 rounded-xl bg-bg p-3.5">
+            <span className="font-mono text-2xl font-medium">{h.n}</span>
+            <span className="text-[13px] text-text-muted">{h.label}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function SettingsCard({ org, readOnly, onSaved }: { org: Organization; readOnly: boolean; onSaved: (org: Pick<Organization, 'working_days' | 'timezone'>) => void }) {
+  const [days, setDays] = useState<Weekday[]>(org.working_days)
+  const [timezone, setTimezone] = useState(org.timezone)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const zones = useMemo(() => {
+    const list = TIMEZONES.includes(org.timezone) ? TIMEZONES : [org.timezone, ...TIMEZONES]
+    return list.map((tz) => ({ tz, label: timezoneLabel(tz) }))
+  }, [org.timezone])
+
+  const dirty = !sameDays(days, org.working_days) || timezone !== org.timezone
+
+  function toggle(day: Weekday) {
+    setSaved(false)
+    setDays((current) => (current.includes(day) ? current.filter((d) => d !== day) : [...current, day].sort((a, b) => a - b)))
+  }
+
+  async function handleSave(event: FormEvent) {
+    event.preventDefault()
+    setError(null)
+    setSaving(true)
+    try {
+      const patch: { working_days?: Weekday[]; timezone?: string } = {}
+      if (!sameDays(days, org.working_days)) patch.working_days = days
+      if (timezone !== org.timezone) patch.timezone = timezone
+      onSaved(await api.updateOrgSettings(patch))
+      setSaved(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save the settings')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSave} aria-labelledby="settings-heading" className="flex flex-col gap-[18px] rounded-[16px] bg-surface p-5 sm:px-7 sm:py-6">
+      <h2 id="settings-heading" className="m-0 text-lg font-semibold">
+        Settings
+      </h2>
+      <div className="flex flex-col gap-2">
+        <span id="working-days-label" className="text-[13px] text-text-muted">
+          Working days
+        </span>
+        <div role="group" aria-labelledby="working-days-label" className="grid max-w-[420px] grid-cols-7 gap-1.5">
+          {WEEKDAYS.map((day) => {
+            const on = days.includes(day.value)
+            return (
+              <button
+                key={day.value}
+                type="button"
+                aria-pressed={on}
+                aria-label={day.full}
+                disabled={readOnly}
+                onClick={() => toggle(day.value)}
+                className={`h-11 rounded-[10px] text-[13px] ${
+                  on ? (readOnly ? 'bg-surface-raised font-semibold text-text' : 'bg-action font-semibold text-on-action') : 'bg-bg text-text-muted'
+                } ${readOnly ? 'cursor-not-allowed' : ''}`}
+              >
+                {day.short}
+              </button>
+            )
+          })}
+        </div>
+        <span className="text-xs text-text-muted">Only working days count toward streaks, late rates and absences.</span>
+      </div>
+      <label className="flex max-w-[420px] flex-col gap-1.5">
+        <span className="text-[13px] text-text-muted">Timezone</span>
+        <select
+          value={timezone}
+          disabled={readOnly}
+          onChange={(e) => {
+            setSaved(false)
+            setTimezone(e.target.value)
+          }}
+          className="h-[46px] rounded-[10px] border border-border bg-bg px-3 text-text disabled:cursor-not-allowed disabled:text-text-muted"
+        >
+          {zones.map((z) => (
+            <option key={z.tz} value={z.tz}>
+              {z.label}
+            </option>
+          ))}
+        </select>
+        <span className="text-xs text-text-muted">"Today" for everyone in the org follows this timezone.</span>
+      </label>
+      {error && (
+        <p role="alert" className="m-0 text-[13px] text-error">
+          {error}
+        </p>
+      )}
+      {saved && !dirty && (
+        <p role="status" className="m-0 flex items-center gap-2 text-sm">
+          <StatusIcon status="approved" size={15} />
+          Settings saved.
+        </p>
+      )}
+      <button
+        type="submit"
+        disabled={readOnly || !dirty || saving || days.length === 0}
+        className={`h-12 self-stretch rounded-[10px] px-[22px] font-semibold sm:self-start ${
+          readOnly ? 'cursor-not-allowed bg-surface-raised text-text-muted' : 'bg-action text-on-action disabled:opacity-50'
+        }`}
+      >
+        {saving ? 'Saving…' : 'Save changes'}
+      </button>
+    </form>
   )
 }

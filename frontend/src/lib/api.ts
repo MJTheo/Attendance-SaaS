@@ -45,6 +45,24 @@ export interface UserProfile {
   email: string
 }
 
+// The signed-in user plus their own org, as GET /auth/me returns it.
+export interface Me extends UserProfile {
+  org_name: string
+  org_plan: string
+  org_timezone: string
+  org_working_days: Weekday[]
+}
+
+// Derived server-side on every read (GET /notifications); drives the
+// sidebar's Inbox badge and the per-queue counts.
+export interface Notifications {
+  leave_approvals: number
+  correction_approvals: number
+  profile_changes: number
+  missed_clockouts: number
+  total: number
+}
+
 // super_admin is a superset of admin — everywhere an 'admin' check gates a
 // view or action, a super admin should pass too.
 export function isAdmin(profile: Pick<UserProfile, 'role'>): boolean {
@@ -108,11 +126,17 @@ export interface StatusDistribution {
 
 export interface DayStatusCounts extends StatusDistribution {
   date: string
+  // Share of the people with a status that day who clocked in; null when
+  // nothing was recorded (computed server-side).
+  present_rate: number | null
 }
 
 export interface CalendarDay {
   date: string
   status: CalendarStatus | null
+  clock_in: string | null
+  clock_out: string | null
+  leave_reason: string | null
 }
 
 export interface DayDetail {
@@ -133,7 +157,9 @@ export interface TeamDayDetail extends DayDetail {
 export interface TeamAnalytics {
   users: UserAnalyticsSummary[]
   by_weekday: WeekdayLateRate[]
-  distribution: StatusDistribution
+  // The 30-day totals also count missed clock-outs (the calendar's
+  // per-day counts don't).
+  distribution: StatusDistribution & { missed_clockout: number }
   trend: DayStatusCounts[]
 }
 
@@ -148,6 +174,7 @@ export interface LeaveRequest {
   status: 'pending' | 'approved' | 'rejected'
   requested_by: string
   requested_by_name: string | null
+  approved_by_name: string | null
   approved_by: string | null
   created_at: string
   resolved_at: string | null
@@ -190,6 +217,8 @@ export interface Correction {
   org_id: string
   requested_by: string
   requested_by_name: string | null
+  approved_by_name: string | null
+  record_clock_in: string | null
   approved_by: string | null
   reason: string
   old_value: CorrectionFields
@@ -230,7 +259,8 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ org_name: orgName, admin_name: adminName, access_code: accessCode }),
     }),
-  me: () => apiFetch<UserProfile>('/auth/me'),
+  me: () => apiFetch<Me>('/auth/me'),
+  notifications: () => apiFetch<Notifications>('/notifications'),
   clockIn: () => apiFetch<AttendanceRecord>('/attendance/clock-in', { method: 'POST' }),
   clockOut: (notes?: string) =>
     apiFetch<AttendanceRecord>('/attendance/clock-out', {

@@ -13,6 +13,7 @@ import { LeaveApprovals } from './routes/LeaveApprovals'
 import { CorrectionApprovals } from './routes/CorrectionApprovals'
 import { AcceptInvite } from './routes/AcceptInvite'
 import { ProtectedRoute } from './routes/ProtectedRoute'
+import { AppLayout } from './routes/AppLayout'
 
 function App() {
   return (
@@ -21,19 +22,21 @@ function App() {
         <Route path="/signin" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
         <Route element={<ProtectedRoute />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/team" element={<Team />} />
-          <Route path="/analytics" element={<Analytics />} />
-          <Route path="/calendar" element={<Calendar />} />
-          <Route path="/company" element={<Company />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/requests" element={<Navigate to="/requests/leave" replace />} />
-          <Route path="/requests/leave" element={<LeaveRequests />} />
-          <Route path="/requests/corrections" element={<CorrectionRequests />} />
-          <Route path="/approvals" element={<Navigate to="/approvals/leave" replace />} />
-          <Route path="/approvals/leave" element={<LeaveApprovals />} />
-          <Route path="/approvals/corrections" element={<CorrectionApprovals />} />
           <Route path="/accept-invite" element={<AcceptInvite />} />
+          <Route element={<AppLayout />}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/team" element={<Team />} />
+            <Route path="/analytics" element={<Analytics />} />
+            <Route path="/calendar" element={<Calendar />} />
+            <Route path="/company" element={<Company />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/requests" element={<Navigate to="/requests/leave" replace />} />
+            <Route path="/requests/leave" element={<LeaveRequests />} />
+            <Route path="/requests/corrections" element={<CorrectionRequests />} />
+            <Route path="/approvals" element={<Navigate to="/approvals/leave" replace />} />
+            <Route path="/approvals/leave" element={<LeaveApprovals />} />
+            <Route path="/approvals/corrections" element={<CorrectionApprovals />} />
+          </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -1,72 +1,113 @@
 @import "tailwindcss";
-@import "@fontsource/space-grotesk/500.css";
-@import "@fontsource/space-grotesk/600.css";
-@import "@fontsource/space-grotesk/700.css";
-@import "@fontsource/jetbrains-mono/400.css";
-@import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/instrument-sans/400.css";
+@import "@fontsource/instrument-sans/500.css";
+@import "@fontsource/instrument-sans/600.css";
+@import "@fontsource/instrument-sans/700.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
 
-/* Dark "systems dashboard" aesthetic is the default. A light variant mirrors
-   the same dense, monospace, ops-tool feel with a light background — theme
-   is user-controlled (persisted in localStorage via lib/theme.ts), not tied
-   to OS preference. */
+/* Design direction B, "warm graphite ledger" (Claude Design canvas, B — full
+   design). Warm paper/graphite neutrals; the only colour in the data is the
+   status palette; vermilion is a signal (brand mark, unread counts, errors),
+   never a status. Light is the default theme; dark is opt-in via
+   data-theme="dark" on <html> (lib/theme.ts + index.html's no-flash script),
+   persisted per browser. */
 @theme {
-  --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
+  --font-sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
 
-  --color-bg: #0a0b0f;
-  --color-surface: #14161c;
-  --color-surface-hover: #1b1e26;
-  --color-border: #262a34;
-  --color-text: #e8eaf0;
-  --color-text-muted: #969ba8;
+  --color-bg: #f3efe6;
+  --color-sidebar: #ebe6da;
+  --color-surface: #fbf9f4;
+  --color-surface-raised: #ece7dc;
+  /* Kept for existing hover styles; same as surface-raised in direction B. */
+  --color-surface-hover: #ece7dc;
+  --color-menu: #fbf9f4;
+  --color-border: #ddd6c8;
+  --color-border-strong: #c6bdab;
+  --color-text: #1d1b17;
+  --color-text-muted: #665f53;
 
-  /* Core status colors, per the design language spec: teal = good/present,
-     amber = warning/late, slate = neutral/inactive. Two more (info, leave)
-     were added alongside sick/annual leave — a calendar showing 6 status
-     types needs more than 3 colors to stay readable, so this extends the
-     original 3-color rule rather than overloading it. */
-  --color-status-good: #2dd4bf;
-  --color-status-good-bg: rgb(45 212 191 / 0.12);
-  --color-status-warning: #f59e0b;
-  --color-status-warning-bg: rgb(245 158 11 / 0.12);
-  --color-status-neutral: #64748b;
-  --color-status-neutral-bg: rgb(100 116 139 / 0.12);
-  --color-status-info: #38bdf8;
-  --color-status-info-bg: rgb(56 189 248 / 0.12);
-  --color-status-leave: #a78bfa;
-  --color-status-leave-bg: rgb(167 139 250 / 0.12);
+  /* Primary actions: graphite on light, paper on dark. */
+  --color-action: #1d1b17;
+  --color-on-action: #f3efe6;
+  --color-signal: #c8361a;
+  --color-on-signal: #ffffff;
+  --color-signal-soft: rgb(200 54 26 / 0.1);
+  --color-error: #b02f14;
+  --color-ring: rgb(29 27 23 / 0.14);
+  --color-overlay: rgb(29 27 23 / 0.36);
+  --color-off-day: rgb(29 27 23 / 0.05);
+  --shadow-menu: 0 20px 48px rgb(29 27 23 / 0.16);
+
+  /* Five status groups, each always paired with its own icon and label
+     (components/StatusDot.tsx), never colour alone. */
+  --color-status-good: #1d7a4c;
+  --color-status-warning: #a3620a;
+  --color-status-neutral: #6e695f;
+  --color-status-sick: #2f63c0;
+  --color-status-annual: #7446c4;
+  --status-tint: 12%;
+  --color-status-good-bg: color-mix(in srgb, var(--color-status-good) var(--status-tint), transparent);
+  --color-status-warning-bg: color-mix(in srgb, var(--color-status-warning) var(--status-tint), transparent);
+  --color-status-neutral-bg: color-mix(in srgb, var(--color-status-neutral) var(--status-tint), transparent);
+  --color-status-sick-bg: color-mix(in srgb, var(--color-status-sick) var(--status-tint), transparent);
+  --color-status-annual-bg: color-mix(in srgb, var(--color-status-annual) var(--status-tint), transparent);
+
+  /* Sign-in side panel: graphite in both themes. */
+  --color-panel: #1d1b17;
+  --color-panel-text: #f1ede4;
+  --color-panel-muted: #aca698;
+  --color-panel-track: #282622;
+  --color-panel-good: #5ccf95;
+
+  --radius-control: 10px;
+  --radius-card: 16px;
 }
 
-/* Light theme override: same tokens, different values. Applied via a
-   data-theme="light" attribute on <html> (see lib/theme.ts + index.html's
-   inline no-flash script). Declared outside any @layer, so it wins over
-   @theme's layered :root output regardless of selector specificity. */
-:root[data-theme="light"] {
-  --color-bg: #f6f7f9;
-  --color-surface: #ffffff;
-  --color-surface-hover: #eef0f3;
-  --color-border: #dfe2e8;
-  --color-text: #14161c;
-  --color-text-muted: #667085;
+/* Dark theme override: same tokens, different values. Declared outside any
+   @layer, so it wins over @theme's layered :root output. */
+:root[data-theme="dark"] {
+  --color-bg: #141311;
+  --color-sidebar: #100f0d;
+  --color-surface: #1d1c19;
+  --color-surface-raised: #282622;
+  --color-surface-hover: #282622;
+  --color-menu: #282622;
+  --color-border: #322f2a;
+  --color-border-strong: #4a463e;
+  --color-text: #f1ede4;
+  --color-text-muted: #aca698;
 
-  --color-status-good: #0d9488;
-  --color-status-good-bg: rgb(13 148 136 / 0.1);
-  --color-status-warning: #d97706;
-  --color-status-warning-bg: rgb(217 119 6 / 0.1);
-  --color-status-neutral: #475569;
-  --color-status-neutral-bg: rgb(71 85 105 / 0.1);
-  --color-status-info: #0284c7;
-  --color-status-info-bg: rgb(2 132 199 / 0.1);
-  --color-status-leave: #7c3aed;
-  --color-status-leave-bg: rgb(124 58 237 / 0.1);
+  --color-action: #f1ede4;
+  --color-on-action: #1d1b17;
+  --color-signal: #ff6a4a;
+  --color-on-signal: #1d0a05;
+  --color-signal-soft: rgb(255 106 74 / 0.14);
+  --color-error: #ff8a70;
+  --color-ring: rgb(241 237 228 / 0.22);
+  --color-overlay: rgb(8 7 6 / 0.62);
+  --color-off-day: rgb(255 255 255 / 0.03);
+  --shadow-menu: 0 20px 48px rgb(0 0 0 / 0.5);
+
+  --color-status-good: #5ccf95;
+  --color-status-warning: #f0b23e;
+  --color-status-neutral: #a39e92;
+  --color-status-sick: #7cb0ff;
+  --color-status-annual: #c39bff;
+  --status-tint: 15%;
+
+  --color-panel: #0c0b0a;
+  --color-panel-track: #1d1c19;
 }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
-:root[data-theme="light"] {
-  color-scheme: light;
+:root[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 body {
@@ -74,5 +115,13 @@ body {
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.45;
   transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+/* Visible keyboard focus everywhere (design: 2px text-colour ring). */
+:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
 }

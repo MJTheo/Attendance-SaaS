@@ -1,101 +1,81 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { api, isAdmin, type Correction, type UserProfile } from '../lib/api'
-import { AppShell } from '../components/AppShell'
-import { CorrectionsList } from '../components/CorrectionsList'
+import { api, isAdmin, type Correction } from '../lib/api'
+import { useMe } from '../lib/me-context'
+import { Page } from '../components/Page'
+import { LoadError, Skeleton } from '../components/Skeleton'
+import { ApprovalQueue } from '../components/ApprovalQueue'
+import { FieldRows } from '../components/RequestCard'
+import { formatDateTime } from '../lib/datetime'
+import { correctionCard, correctionSummary } from '../lib/requests'
 
 export function CorrectionApprovals() {
-  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const { me, refreshNotifications } = useMe()
+  const tz = me.org_timezone
   const [corrections, setCorrections] = useState<Correction[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    setLoading(true)
+    setError(null)
     try {
-      const me = await api.me()
-      setProfile(me)
-      if (!isAdmin(me)) return
       setCorrections(await api.corrections())
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load')
     } finally {
-      setLoading(false)
+      setLoaded(true)
     }
   }, [])
 
   useEffect(() => {
-    load()
-  }, [load])
+    if (isAdmin(me)) load()
+  }, [me, load])
 
-  async function handleApprove(id: string) {
-    setError(null)
-    try {
-      await api.approveCorrection(id)
-      await load()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to approve')
-    }
+  if (!isAdmin(me)) return <Navigate to="/" replace />
+
+  async function decide(id: string, approve: boolean) {
+    await (approve ? api.approveCorrection(id) : api.rejectCorrection(id))
+    await load()
+    refreshNotifications()
   }
 
-  async function handleReject(id: string) {
-    setError(null)
-    try {
-      await api.rejectCorrection(id)
-      await load()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reject')
-    }
-  }
-
-  if (loading && !profile) {
-    return <div className="flex min-h-screen items-center justify-center text-text-muted">Loading…</div>
-  }
-
-  if (!profile) {
-    return <div className="flex min-h-screen items-center justify-center text-text-muted">Something went wrong.</div>
-  }
-
-  if (!isAdmin(profile)) {
-    return <Navigate to="/" replace />
-  }
-
-  const pendingCorrections = corrections.filter((c) => c.status === 'pending')
-  const resolvedCorrections = corrections.filter((c) => c.status !== 'pending')
+  const pending = corrections
+    .filter((c) => c.status === 'pending')
+    .map((c) => {
+      const card = correctionCard(c, tz)
+      return {
+        id: c.id,
+        who: c.requested_by_name ?? 'Someone',
+        meta: `Correction · ${card.title} · sent ${formatDateTime(c.created_at, tz)}`,
+        body: <FieldRows fields={card.fields} />,
+        reason: c.reason,
+      }
+    })
+  const resolved = corrections
+    .filter((c) => c.status !== 'pending')
+    .map((c) => ({ id: c.id, who: c.requested_by_name ?? 'Someone', summary: correctionSummary(c, tz), status: c.status }))
 
   return (
-    <AppShell profile={profile}>
-      <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
-        <h1 className="mb-4 font-sans text-lg font-semibold text-text">Correction approvals</h1>
-
-        {error && <p className="mb-4 font-mono text-sm text-status-warning">{error}</p>}
-
-        <section className="mb-8">
-          <h2 className="mb-3 font-sans text-sm font-semibold uppercase tracking-wide text-text-muted">
-            Pending
-          </h2>
-          {loading ? (
-            <p className="font-mono text-sm text-text-muted">Loading…</p>
-          ) : (
-            <CorrectionsList
-              corrections={pendingCorrections}
-              showActions
-              showRequester
-              onApprove={handleApprove}
-              onReject={handleReject}
-            />
-          )}
-        </section>
-
-        {resolvedCorrections.length > 0 && (
-          <section>
-            <h2 className="mb-3 font-sans text-sm font-semibold uppercase tracking-wide text-text-muted">
-              Resolved
-            </h2>
-            <CorrectionsList corrections={resolvedCorrections} showRequester />
-          </section>
-        )}
-      </main>
-    </AppShell>
+    <Page title="Correction approvals" sub={me.org_name} maxWidth={900}>
+      {!loaded ? (
+        <Skeleton />
+      ) : error ? (
+        <LoadError message={error} onRetry={load} />
+      ) : (
+        <ApprovalQueue
+          heading="Waiting for you"
+          pending={pending}
+          resolved={resolved}
+          emptyTitle="All caught up"
+          emptyBody="New requests land here and in your Inbox. Resolved ones stay below for reference."
+          onDecide={decide}
+          toastFor={(item, approved) =>
+            approved
+              ? `Approved. ${item.who}’s record is updated, and the old values are kept in the audit trail.`
+              : `Rejected. ${item.who} will see it in their requests.`
+          }
+        />
+      )}
+    </Page>
   )
 }
