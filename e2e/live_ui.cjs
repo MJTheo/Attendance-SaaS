@@ -85,7 +85,9 @@ async function staff(browser) {
   check('staff', 'Nav is four plain links, no dropcards',
     JSON.stringify(links) === JSON.stringify(['Dashboard', 'Calendar', 'Leave', 'Corrections']) &&
       (await s.page.locator('aside nav button').count()) === 0, links.join(', '))
-  check('staff', 'Dashboard shows the today card and streak', /Today[\s\S]*Streak/.test(await s.page.locator('main').innerText()))
+  const dash = await s.page.locator('main').innerText()
+  // The streak pill sits in the page header, above the Today card.
+  check('staff', 'Dashboard shows the today card and streak', /Today/.test(dash) && /Streak/.test(dash))
   await shot(s, 'staff-dashboard')
   for (const route of ['/team', '/analytics', '/company', '/approvals/leave', '/approvals/corrections']) {
     const v = await visit(s, route)
