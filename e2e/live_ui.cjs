@@ -56,17 +56,21 @@ async function signIn(browser, role, viewport) {
   return s
 }
 
-// Each page shows a full-screen "Loading…" until its data arrives, so wait for
-// the page's own heading (when it has one) and for any loading text to clear.
+// Pages show in-place skeletons (aria-busy) while their data loads; wait for
+// those (and any older "Loading…" text) to clear before reading the page.
+function waitForData(page) {
+  return page
+    .waitForFunction(() => !document.querySelector('[aria-busy="true"]') && !document.body.innerText.includes('Loading…'), null, { timeout: 15000 })
+    .catch(() => {})
+}
+
 async function visit(s, route, heading) {
   s.errors.api.length = 0
   s.errors.page.length = 0
   await s.page.goto(BASE + route)
   if (heading) await s.page.waitForSelector(`h1:has-text("${heading}")`, { timeout: 15000 }).catch(() => {})
   await s.page.waitForLoadState('networkidle')
-  await s.page
-    .waitForFunction(() => !document.body.innerText.includes('Loading…'), null, { timeout: 10000 })
-    .catch(() => {})
+  await waitForData(s.page)
   return { path: new URL(s.page.url()).pathname, problems: [...s.errors.api, ...s.errors.page] }
 }
 
@@ -99,7 +103,7 @@ async function staff(browser) {
       (await s.page.locator('aside button:has-text("Sign out")').count()) === 1)
   await s.page.click('aside a:has-text("My profile")')
   await s.page.waitForSelector('h1:has-text("My profile")')
-  await s.page.waitForFunction(() => !document.body.innerText.includes('Loading…'), null, { timeout: 10000 })
+  await waitForData(s.page)
   // innerText follows CSS text-transform, so section headings come back uppercase.
   const profileText = await s.page.locator('main').innerText()
   // live_api.py files name changes for this account, so the history must list them.

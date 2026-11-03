@@ -155,7 +155,7 @@ export function Calendar() {
                 setView(v)
                 if (v === 'mine') setPersonId('')
               }}
-              className={`h-9 rounded-[9px] px-4 text-[13px] ${view === v ? 'bg-action font-semibold text-on-action' : 'text-text-muted'}`}
+              className={`h-9 rounded-[9px] px-4 text-[13px] max-sm:h-11 ${view === v ? 'bg-action font-semibold text-on-action' : 'text-text-muted'}`}
             >
               {v === 'mine' ? 'Mine' : 'Team'}
             </button>
