@@ -34,6 +34,21 @@ export function RequestCard({
         </div>
         <StatusDot status={status} />
       </div>
+      <FieldRows fields={fields} />
+      <div className="text-sm">
+        <span className="text-text-muted">Reason: </span>
+        {reason}
+      </div>
+      {actions}
+    </article>
+  )
+}
+
+// Each field as old → new on a sunken row; shared with the admin approval
+// queues so a request reads the same on both sides.
+export function FieldRows({ fields }: { fields: RequestField[] }) {
+  return (
+    <>
       {fields.map((field) => (
         <div
           key={field.label}
@@ -50,12 +65,7 @@ export function RequestCard({
           </span>
         </div>
       ))}
-      <div className="text-sm">
-        <span className="text-text-muted">Reason: </span>
-        {reason}
-      </div>
-      {actions}
-    </article>
+    </>
   )
 }
 

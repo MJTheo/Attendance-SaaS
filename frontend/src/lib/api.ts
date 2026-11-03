@@ -126,6 +126,9 @@ export interface StatusDistribution {
 
 export interface DayStatusCounts extends StatusDistribution {
   date: string
+  // Share of the people with a status that day who clocked in; null when
+  // nothing was recorded (computed server-side).
+  present_rate: number | null
 }
 
 export interface CalendarDay {
@@ -154,7 +157,9 @@ export interface TeamDayDetail extends DayDetail {
 export interface TeamAnalytics {
   users: UserAnalyticsSummary[]
   by_weekday: WeekdayLateRate[]
-  distribution: StatusDistribution
+  // The 30-day totals also count missed clock-outs (the calendar's
+  // per-day counts don't).
+  distribution: StatusDistribution & { missed_clockout: number }
   trend: DayStatusCounts[]
 }
 

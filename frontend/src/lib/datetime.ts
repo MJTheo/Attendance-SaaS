@@ -1,13 +1,3 @@
-export function formatTimestamp(value: string | null) {
-  if (!value) return '—'
-  return new Date(value).toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
 // ---- Org-timezone formatting ------------------------------------------------
 // Every org works in its own IANA timezone (organizations.timezone), which
 // defines "today" for everyone in it. These format server timestamps in that

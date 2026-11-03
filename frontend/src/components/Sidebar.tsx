@@ -58,7 +58,7 @@ function inboxTarget(me: Me, n: Notifications | null): string {
   if (!isAdmin(me)) return '/'
   if (!n || n.leave_approvals > 0) return '/approvals/leave'
   if (n.correction_approvals > 0) return '/approvals/corrections'
-  if (n.profile_changes > 0) return '/team'
+  if (n.profile_changes > 0) return '/team?tab=requests'
   return '/approvals/leave'
 }
 

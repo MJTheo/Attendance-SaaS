@@ -179,7 +179,7 @@ change against the free tier's rate limit. **Applied and live-tested** (migratio
 `20261102100000_profile_edit_requests.sql`), except one real email change end to end — see open
 follow-ups at the top.
 
-### Redesign to direction B — in progress (three PRs)
+### Redesign to direction B — built (three PRs)
 Claude Design round of 2026-11-02 produced three directions; **B, "warm graphite ledger"**, was
 chosen and is fully specified for every screen at desktop and 390px
 ([canvas](https://claude.ai/code/artifact/0eff596e-9201-481b-bbcb-f412c4fbd55a), page "B — full
@@ -190,7 +190,12 @@ onboarding/invite screens; **(2) everyday screens** — Dashboard (today timelin
 history), Calendar, my leave/corrections, Profile; **(3) admin screens** — approvals, Team as tabs,
 Analytics, Company. `CLAUDE.md`'s design language now describes B. PR 2 also extends `/auth/me` with
 the org's working days and the personal calendar with each day's times/leave reason, and adds the
-approver name and corrected record's date to the request lists.
+approver name and corrected record's date to the request lists. PR 3 rebuilds the approval queues (shared
+`ApprovalQueue`: "Waiting for you" cards, a confirmation toast, the resolved list), turns Team into
+tabs (Attendance grid by day/week/month, profile-change Requests, Roles for super admins, Invite),
+restyles Analytics (the trend now plots a server-side `present_rate`, and the distribution counts
+missed clock-outs) and Company (a Save changes button instead of saving on every click, timezone
+offsets in the picker, demo detection by `plan` instead of the demo login's email).
 
 ### Notifications — counts shipped with the redesign; Inbox page still to build
 **Done:** `GET /notifications` derives the counts on read, and the sidebar's Inbox button and the

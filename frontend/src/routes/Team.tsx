@@ -1,368 +1,528 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useSearchParams } from 'react-router-dom'
 import {
   api,
   isAdmin,
+  type LeaveRequest,
   type ProfileEditRequest,
+  type ProfileFields,
   type Role,
   type TeamAttendanceRecord,
   type UserProfile,
 } from '../lib/api'
-import { DEMO_ADMIN_EMAIL } from '../lib/demo'
-import { Skeleton } from '../components/Skeleton'
 import { useMe } from '../lib/me-context'
-import { ProfileEditsList } from '../components/ProfileEditsList'
-import { StatusDot } from '../components/StatusDot'
-import { formatTimestamp } from '../lib/datetime'
-import { formatPeriodLabel, periodRange, shiftPeriod, type Granularity } from '../lib/period'
+import { Page } from '../components/Page'
+import { LoadError, Skeleton } from '../components/Skeleton'
+import { ApprovalQueue } from '../components/ApprovalQueue'
+import { StatusIcon, formatStatusLabel } from '../components/StatusDot'
+import { addDays, formatDateTime, formatDayLong, formatDayShort, formatTime, formatWeek, localDate, mondayOf, zonedToUtc } from '../lib/datetime'
 
-const ROLE_LABEL: Record<Role, string> = {
-  staff: 'Staff',
-  admin: 'Admin',
-  super_admin: 'Super admin',
-}
+const ROLE_LABEL: Record<Role, string> = { staff: 'Staff', admin: 'Admin', super_admin: 'Super admin' }
+const FIELD_LABEL: Record<keyof ProfileFields, string> = { name: 'Name', email: 'Email' }
 
-// Bordered pill, not a StatusDot color — roles aren't attendance status, and
-// reusing that dot language here would blur what the colored dots mean
-// elsewhere in the app. super_admin borrows the existing "good" accent
-// (already used for active-nav/you-are-here) to read as the elevated role,
-// rather than introducing a new hue.
-const ROLE_BADGE_CLASS: Record<Role, string> = {
-  staff: 'rounded-full border border-border px-2 py-0.5 text-xs text-text-muted',
-  admin: 'rounded-full border border-border px-2 py-0.5 text-xs text-text',
-  super_admin: 'rounded-full border border-status-good/40 bg-status-good/10 px-2 py-0.5 text-xs text-status-good',
-}
+type Tab = 'attendance' | 'requests' | 'roles' | 'invite'
+type Granularity = 'day' | 'week' | 'month'
+
+const SEG_ON = 'bg-action font-semibold text-on-action'
+const SEG_OFF = 'bg-transparent text-text-muted hover:text-text'
 
 function initials(name: string): string {
-  const parts = name.trim().split(/\s+/)
-  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase()
+  const parts = name.trim().split(/[\s-]+/)
+  return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : (parts[0]?.[1] ?? ''))).toUpperCase()
+}
+
+function changeTitle(request: ProfileEditRequest): string {
+  const fields = Object.keys(request.new_value)
+  if (fields.length > 1) return 'Name and email change'
+  return fields[0] === 'email' ? 'Email change' : 'Name change'
+}
+
+function changedFields(request: ProfileEditRequest): (keyof ProfileFields)[] {
+  return (['name', 'email'] as const).filter((f) => request.new_value[f] !== undefined)
 }
 
 export function Team() {
-  const { me: profile, refreshMe, refreshNotifications } = useMe()
-  const [loaded, setLoaded] = useState(false)
-  const [records, setRecords] = useState<TeamAttendanceRecord[]>([])
-  const [recordsLoading, setRecordsLoading] = useState(true)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteName, setInviteName] = useState('')
-  const [inviteError, setInviteError] = useState<string | null>(null)
-  const [inviteSuccess, setInviteSuccess] = useState<string | null>(null)
-  const [inviting, setInviting] = useState(false)
-  const [granularity, setGranularity] = useState<Granularity>('week')
-  const [reference, setReference] = useState(() => new Date())
+  const { me, notifications, refreshMe, refreshNotifications } = useMe()
+  const [params, setParams] = useSearchParams()
+  const isSuper = me.role === 'super_admin'
+  const isDemo = me.org_plan === 'demo'
+  const requested = params.get('tab') as Tab | null
+  const tab: Tab = requested && (requested !== 'roles' || isSuper) ? requested : 'attendance'
+
   const [members, setMembers] = useState<UserProfile[]>([])
-  const [roleUpdatingId, setRoleUpdatingId] = useState<string | null>(null)
-  const [roleError, setRoleError] = useState<string | null>(null)
-  const [profileEdits, setProfileEdits] = useState<ProfileEditRequest[]>([])
-  const [profileEditError, setProfileEditError] = useState<string | null>(null)
+  const [edits, setEdits] = useState<ProfileEditRequest[]>([])
+  const [loaded, setLoaded] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    setLoading(true)
+    setError(null)
     try {
-      if (!isAdmin(profile)) return
-      setProfileEdits(await api.profileEdits())
-      if (profile.role === 'super_admin') setMembers(await api.teamMembers())
+      const [memberList, editList] = await Promise.all([api.teamMembers(), api.profileEdits()])
+      setMembers(memberList)
+      setEdits(editList)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load')
     } finally {
-      setLoading(false)
       setLoaded(true)
     }
-  }, [profile])
+  }, [])
 
-  async function handleRoleChange(userId: string, role: Role) {
-    setRoleError(null)
-    setRoleUpdatingId(userId)
+  useEffect(() => {
+    if (isAdmin(me)) load()
+  }, [me, load])
+
+  if (!isAdmin(me)) return <Navigate to="/" replace />
+
+  const tabs: { key: Tab; label: string; count?: number }[] = [
+    { key: 'attendance', label: 'Attendance' },
+    { key: 'requests', label: 'Requests', count: notifications?.profile_changes },
+    ...(isSuper ? [{ key: 'roles' as const, label: 'Roles' }] : []),
+    { key: 'invite', label: 'Invite' },
+  ]
+
+  return (
+    <Page title="Team" sub={loaded && !error ? `${members.length} members · ${me.org_name}` : me.org_name} demo={isDemo}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div role="tablist" aria-label="Team sections" className="flex max-w-full gap-1 overflow-x-auto rounded-xl bg-surface p-1">
+          {tabs.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={t.key === tab}
+              onClick={() => setParams(t.key === 'attendance' ? {} : { tab: t.key }, { replace: true })}
+              className={`flex h-10 flex-none items-center gap-2 rounded-[9px] px-3.5 text-sm ${t.key === tab ? SEG_ON : SEG_OFF}`}
+            >
+              {t.label}
+              {!!t.count && (
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-[10px] bg-signal px-1.5 font-mono text-[11px] font-semibold text-on-signal">
+                  {t.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+        <span className="hidden text-[13px] text-text-muted sm:inline">Leave and correction approvals are in Inbox</span>
+      </div>
+
+      {tab === 'attendance' ? (
+        <AttendanceTab members={members} />
+      ) : !loaded ? (
+        <Skeleton />
+      ) : error ? (
+        <LoadError message={error} onRetry={load} />
+      ) : tab === 'requests' ? (
+        <RequestsTab
+          edits={edits}
+          onDecide={async (id, approve) => {
+            await (approve ? api.approveProfileEdit(id) : api.rejectProfileEdit(id))
+            // An approved name shows up in the roles list too (and in the
+            // sidebar, if it was the sole admin's own change).
+            await load()
+            refreshNotifications()
+            refreshMe()
+          }}
+        />
+      ) : tab === 'roles' ? (
+        <RolesTab members={members} meId={me.id} onChange={(updated) => setMembers((list) => list.map((m) => (m.id === updated.id ? updated : m)))} />
+      ) : (
+        <InviteTab readOnly={isDemo} />
+      )}
+    </Page>
+  )
+}
+
+function periodDays(anchor: string, granularity: Granularity): string[] {
+  if (granularity === 'day') return [anchor]
+  if (granularity === 'week') {
+    const monday = mondayOf(anchor)
+    return Array.from({ length: 7 }, (_, i) => addDays(monday, i))
+  }
+  const first = `${anchor.slice(0, 8)}01`
+  const days: string[] = []
+  for (let d = first; d.slice(0, 7) === first.slice(0, 7); d = addDays(d, 1)) days.push(d)
+  return days
+}
+
+function shiftAnchor(anchor: string, granularity: Granularity, delta: number): string {
+  if (granularity === 'day') return addDays(anchor, delta)
+  if (granularity === 'week') return addDays(anchor, delta * 7)
+  const [y, m] = anchor.split('-').map(Number)
+  const d = new Date(Date.UTC(y, m - 1 + delta, 1))
+  return d.toISOString().slice(0, 10)
+}
+
+function periodLabel(anchor: string, granularity: Granularity): string {
+  const year = anchor.slice(0, 4)
+  if (granularity === 'day') return `${formatDayLong(anchor)}, ${year}`
+  if (granularity === 'week') {
+    const monday = mondayOf(anchor)
+    return `Week of ${formatWeek(monday)}, ${addDays(monday, 6).slice(0, 4)}`
+  }
+  return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${anchor}T12:00:00Z`))
+}
+
+const PERIOD_NOUN: Record<Granularity, string> = { day: 'day', week: 'week', month: 'month' }
+
+// Who was in, per working day of the period, in the org's timezone: one
+// row per member, one cell per day with the status (icon + label) and the
+// clock-in time. Approved leave fills days that have no record.
+function AttendanceTab({ members }: { members: UserProfile[] }) {
+  const { me } = useMe()
+  const tz = me.org_timezone
+  const [granularity, setGranularity] = useState<Granularity>('week')
+  const [anchor, setAnchor] = useState(() => localDate(new Date(), tz))
+  const [records, setRecords] = useState<TeamAttendanceRecord[]>([])
+  const [leave, setLeave] = useState<LeaveRequest[]>([])
+  const [loaded, setLoaded] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const allDays = periodDays(anchor, granularity)
+  const first = allDays[0]
+  const last = allDays[allDays.length - 1]
+
+  const load = useCallback(async () => {
+    setError(null)
+    setLoaded(false)
     try {
-      const updated = await api.updateUserRole(userId, role)
-      setMembers((current) => current.map((m) => (m.id === updated.id ? updated : m)))
+      const [attendance, leaveRequests] = await Promise.all([
+        api.teamAttendance({ start: zonedToUtc(first, '00:00', tz), end: zonedToUtc(addDays(last, 1), '00:00', tz) }),
+        api.leaveRequests(),
+      ])
+      setRecords(attendance)
+      setLeave(leaveRequests.filter((l) => l.status === 'approved' && l.start_date <= last && l.end_date >= first))
     } catch (err) {
-      setRoleError(err instanceof Error ? err.message : 'Failed to update role')
+      setError(err instanceof Error ? err.message : 'Failed to load attendance')
     } finally {
-      setRoleUpdatingId(null)
+      setLoaded(true)
     }
-  }
-
-  async function handleProfileEdit(id: string, approve: boolean) {
-    setProfileEditError(null)
-    try {
-      if (approve) {
-        await api.approveProfileEdit(id)
-      } else {
-        await api.rejectProfileEdit(id)
-      }
-      // Re-read everything: an approved name shows up in the roles table too
-      // (and in the sidebar, if it was the sole admin's own change).
-      await load()
-      refreshNotifications()
-      refreshMe()
-    } catch (err) {
-      // e.g. "Another admin has to review your own profile change"
-      setProfileEditError(err instanceof Error ? err.message : 'Failed to update request')
-    }
-  }
+  }, [first, last, tz])
 
   useEffect(() => {
     load()
   }, [load])
 
-  const loadAttendance = useCallback(async () => {
-    setRecordsLoading(true)
-    try {
-      const { start, end } = periodRange(reference, granularity)
-      const attendance = await api.teamAttendance({ start: start.toISOString(), end: end.toISOString() })
-      setRecords(attendance)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load attendance')
-    } finally {
-      setRecordsLoading(false)
-    }
-  }, [reference, granularity])
+  const working = new Set<number>(me.org_working_days)
+  const workingDays = allDays.filter((d) => working.has((new Date(`${d}T12:00:00Z`).getUTCDay() + 6) % 7))
+  const days = workingDays.length > 0 ? workingDays : allDays
 
-  useEffect(() => {
-    if (profile && isAdmin(profile)) loadAttendance()
-  }, [profile, loadAttendance])
+  const byCell = new Map<string, TeamAttendanceRecord>()
+  for (const r of records) byCell.set(`${r.user_id}|${localDate(r.clock_in, tz)}`, r)
+  const leaveOn = (userId: string, day: string) => leave.find((l) => l.user_id === userId && l.start_date <= day && l.end_date >= day)
 
-  async function handleInvite(event: FormEvent) {
-    event.preventDefault()
-    setInviteError(null)
-    setInviteSuccess(null)
-    setInviting(true)
-    try {
-      await api.inviteStaff(inviteEmail, inviteName)
-      setInviteSuccess(`Invite sent to ${inviteEmail}`)
-      setInviteEmail('')
-      setInviteName('')
-    } catch (err) {
-      // The backend's detail message is already specific (already registered,
-      // rate limited, etc.) — surface it as-is rather than re-classifying by status.
-      setInviteError(err instanceof Error ? err.message : 'Failed to send invite')
-    } finally {
-      setInviting(false)
-    }
-  }
+  // Everyone on the roster, plus anyone with records who's since left it.
+  const rows = [...members]
+  for (const r of records) if (!rows.some((m) => m.id === r.user_id)) rows.push({ id: r.user_id, name: r.user_name } as UserProfile)
+  rows.sort((a, b) => a.name.localeCompare(b.name))
 
-  if (!isAdmin(profile)) {
-    return <Navigate to="/" replace />
-  }
-
-  if (!loaded) {
-    return (
-      <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
-        <Skeleton />
-      </main>
-    )
-  }
+  const columns = `minmax(180px,1.4fr) repeat(${days.length}, minmax(${granularity === 'month' ? 96 : 0}px,1fr))`
+  const minWidth = granularity === 'day' ? undefined : 200 + days.length * (granularity === 'month' ? 106 : 132)
 
   return (
-    <>
-      <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
-        <h1 className="mb-4 font-sans text-lg font-semibold text-text">Team</h1>
+    <section aria-label="Team attendance" className="flex flex-col gap-3.5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <button type="button" aria-label="Previous period" onClick={() => setAnchor((a) => shiftAnchor(a, granularity, -1))} className="flex h-11 w-11 items-center justify-center rounded-[10px] bg-surface">
+            <Chevron d="M15 6l-6 6 6 6" />
+          </button>
+          <span className="text-[15px] font-semibold">{periodLabel(anchor, granularity)}</span>
+          <button type="button" aria-label="Next period" onClick={() => setAnchor((a) => shiftAnchor(a, granularity, 1))} className="flex h-11 w-11 items-center justify-center rounded-[10px] bg-surface">
+            <Chevron d="M9 6l6 6-6 6" />
+          </button>
+        </div>
+        <div role="group" aria-label="Period" className="flex gap-1 rounded-xl bg-surface p-1">
+          {(['day', 'week', 'month'] as const).map((g) => (
+            <button
+              key={g}
+              type="button"
+              aria-pressed={granularity === g}
+              onClick={() => setGranularity(g)}
+              className={`h-9 rounded-lg px-3.5 text-[13px] ${granularity === g ? SEG_ON : SEG_OFF}`}
+            >
+              {{ day: 'Daily', week: 'Weekly', month: 'Monthly' }[g]}
+            </button>
+          ))}
+        </div>
+      </div>
 
-        {error && <p className="mb-4 font-mono text-sm text-status-warning">{error}</p>}
-
-        <section className="mb-8">
-          <h2 className="mb-3 font-sans text-sm font-semibold uppercase tracking-wide text-text-muted">
-            Profile change requests
-          </h2>
-          {profileEditError && <p className="mb-3 font-mono text-xs text-status-warning">{profileEditError}</p>}
-          {loading ? (
-            <p className="font-mono text-sm text-text-muted">Loading…</p>
-          ) : (
-            <ProfileEditsList
-              requests={profileEdits.filter((r) => r.status === 'pending')}
-              showActions
-              showRequester
-              onApprove={(id) => handleProfileEdit(id, true)}
-              onReject={(id) => handleProfileEdit(id, false)}
-            />
-          )}
-          {profileEdits.some((r) => r.status !== 'pending') && (
-            <details className="mt-3">
-              <summary className="cursor-pointer font-mono text-xs text-text-muted hover:text-text">
-                Resolved requests
-              </summary>
-              <div className="mt-3">
-                <ProfileEditsList requests={profileEdits.filter((r) => r.status !== 'pending')} showRequester />
-              </div>
-            </details>
-          )}
-        </section>
-
-        {profile.role === 'super_admin' && (
-          <section className="mb-8">
-            <h2 className="mb-3 font-sans text-sm font-semibold uppercase tracking-wide text-text-muted">
-              Team roles
-            </h2>
-            {roleError && <p className="mb-3 font-mono text-xs text-status-warning">{roleError}</p>}
-            <div className="overflow-x-auto rounded-lg border border-border">
-              <table className="w-full border-collapse font-mono text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-text-muted">
-                    <th className="px-2 py-2 font-normal sm:px-4">Member</th>
-                    <th className="px-2 py-2 font-normal sm:px-4">Role</th>
-                    <th className="px-2 py-2 font-normal sm:px-4">Change role</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {members.map((member) => {
-                    const isSelf = member.id === profile.id
-                    const lockedSuperAdmin = isSelf && member.role === 'super_admin'
+      {!loaded ? (
+        <Skeleton />
+      ) : error ? (
+        <LoadError message={error} onRetry={load} />
+      ) : records.length === 0 && leave.length === 0 ? (
+        <div className="flex flex-col items-start gap-2.5 rounded-[16px] bg-surface p-[22px]">
+          <span className="text-base font-semibold">Nothing recorded for this {PERIOD_NOUN[granularity]} yet</span>
+          <span className="text-sm text-text-muted">
+            Rows fill in as people clock in. Go back a {PERIOD_NOUN[granularity]} to see the last full one.
+          </span>
+          <button
+            type="button"
+            onClick={() => setAnchor((a) => shiftAnchor(a, granularity, -1))}
+            className="h-11 rounded-[10px] bg-action px-[18px] font-semibold text-on-action"
+          >
+            Previous {PERIOD_NOUN[granularity]}
+          </button>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-[16px] bg-surface">
+          <div style={{ minWidth }}>
+            <div className="grid h-[42px] items-center gap-2.5 px-[18px] text-xs font-semibold text-text-muted" style={{ gridTemplateColumns: columns }}>
+              <div className="sticky left-0 bg-surface">Member</div>
+              {days.map((d) => (
+                <div key={d} className="font-mono font-medium">
+                  {formatDayShort(d)}
+                </div>
+              ))}
+            </div>
+            {rows.map((member) => (
+              <div
+                key={member.id}
+                className="grid min-h-[50px] items-center gap-2.5 border-t border-border px-[18px] py-[3px]"
+                style={{ gridTemplateColumns: columns }}
+              >
+                <div className="sticky left-0 truncate bg-surface text-sm">{member.name}</div>
+                {days.map((day) => {
+                  const record = byCell.get(`${member.id}|${day}`)
+                  const onLeave = !record ? leaveOn(member.id, day) : undefined
+                  const status = record?.status ?? (onLeave ? (onLeave.leave_type === 'sick' ? 'sick_leave' : 'annual_leave') : null)
+                  if (!status) {
                     return (
-                      <tr key={member.id} className="border-b border-border last:border-0">
-                        <td className="px-2 py-2 sm:px-4">
-                          <div className="flex items-center gap-3">
-                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-border/60 font-sans text-xs font-semibold text-text">
-                              {initials(member.name)}
-                            </span>
-                            <div className="min-w-0">
-                              <p className="truncate text-text">
-                                {member.name}
-                                {isSelf && <span className="text-text-muted"> (you)</span>}
-                              </p>
-                              <p className="truncate text-xs text-text-muted">{member.email}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-2 py-2 sm:px-4">
-                          <span className={ROLE_BADGE_CLASS[member.role]}>{ROLE_LABEL[member.role]}</span>
-                        </td>
-                        <td className="px-2 py-2 sm:px-4">
-                          <select
-                            value={member.role}
-                            onChange={(e) => handleRoleChange(member.id, e.target.value as Role)}
-                            disabled={roleUpdatingId === member.id || lockedSuperAdmin}
-                            title={lockedSuperAdmin ? "You can't remove your own super admin role" : undefined}
-                            className="rounded-md border border-border bg-bg px-2 py-1.5 font-mono text-xs text-text outline-none focus:border-status-good disabled:opacity-50"
-                          >
-                            {(Object.keys(ROLE_LABEL) as Role[]).map((role) => (
-                              <option key={role} value={role}>
-                                {ROLE_LABEL[role]}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                      </tr>
+                      <span key={day} className="font-mono text-xs text-text-muted">
+                        —
+                      </span>
                     )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
+                  }
+                  // An auto-absent row's clock_in is a placeholder, not a time.
+                  const time = record && record.status !== 'absent' ? `in ${formatTime(record.clock_in, tz)}` : '—'
+                  return (
+                    <div key={day} className="flex min-w-0 flex-col gap-px" title={record?.notes ?? undefined}>
+                      <span className="flex items-center gap-[5px] whitespace-nowrap text-xs">
+                        <StatusIcon status={status} size={13} />
+                        <span className={status === 'present' ? 'text-text-muted' : 'font-medium'}>{formatStatusLabel(status)}</span>
+                      </span>
+                      <span className="pl-[18px] font-mono text-[11px] text-text-muted">{time}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
 
-        {profile.email !== DEMO_ADMIN_EMAIL && (
-          <section className="mb-8 rounded-lg border border-border bg-surface p-4 sm:p-6">
-            <h2 className="mb-3 font-sans text-sm font-semibold uppercase tracking-wide text-text-muted">
-              Invite staff
-            </h2>
-            {inviteError && <p className="mb-3 font-mono text-xs text-status-warning">{inviteError}</p>}
-            {inviteSuccess && <p className="mb-3 font-mono text-xs text-status-good">{inviteSuccess}</p>}
-            <form onSubmit={handleInvite} className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-              <label className="block">
-                <span className="mb-1 block font-mono text-xs uppercase tracking-wide text-text-muted">Name</span>
-                <input
-                  type="text"
-                  value={inviteName}
-                  onChange={(e) => setInviteName(e.target.value)}
-                  required
-                  className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-status-good sm:w-auto"
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1 block font-mono text-xs uppercase tracking-wide text-text-muted">Email</span>
-                <input
-                  type="email"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  required
-                  className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-status-good sm:w-auto"
-                />
-              </label>
-              <button
-                type="submit"
-                disabled={inviting}
-                className="rounded-md bg-status-good px-4 py-2 font-medium text-bg transition-opacity hover:opacity-90 disabled:opacity-50"
-              >
-                {inviting ? 'Sending…' : 'Send invite'}
-              </button>
-            </form>
-          </section>
-        )}
+function Chevron({ d }: { d: string }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={d} />
+    </svg>
+  )
+}
 
-        <section>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-sans text-sm font-semibold uppercase tracking-wide text-text-muted">
-              Team attendance
-            </h2>
-            <div className="flex flex-wrap items-center gap-2">
-              <select
-                value={granularity}
-                onChange={(e) => setGranularity(e.target.value as Granularity)}
-                className="rounded-md border border-border bg-bg px-2 py-1.5 font-mono text-xs text-text outline-none focus:border-status-good"
-              >
-                <option value="day">Daily</option>
-                <option value="week">Weekly</option>
-                <option value="month">Monthly</option>
-              </select>
-              <div className="flex items-center gap-1 font-mono text-xs text-text-muted">
-                <button
-                  onClick={() => setReference((r) => shiftPeriod(r, granularity, -1))}
-                  className="rounded-md border border-border px-2 py-1.5 hover:text-text"
-                  aria-label="Previous period"
-                >
-                  ←
-                </button>
-                <span className="min-w-[10rem] px-1 text-center text-text">
-                  {formatPeriodLabel(reference, granularity)}
-                </span>
-                <button
-                  onClick={() => setReference((r) => shiftPeriod(r, granularity, 1))}
-                  className="rounded-md border border-border px-2 py-1.5 hover:text-text"
-                  aria-label="Next period"
-                >
-                  →
-                </button>
+function RequestsTab({ edits, onDecide }: { edits: ProfileEditRequest[]; onDecide: (id: string, approve: boolean) => Promise<void> }) {
+  const { me } = useMe()
+  const tz = me.org_timezone
+  const pending = edits
+    .filter((r) => r.status === 'pending')
+    .map((r) => ({
+      id: r.id,
+      who: r.user_name ?? 'Someone',
+      meta: `${changeTitle(r)} · ${formatDateTime(r.created_at, tz)}`,
+      body: (
+        <div className="flex flex-col gap-2">
+          {changedFields(r).map((f) => (
+            <div key={f} className="grid grid-cols-1 items-center gap-2 sm:grid-cols-[minmax(0,1fr)_24px_minmax(0,1fr)]">
+              <div className="flex flex-col gap-0.5 rounded-xl bg-bg px-3 py-2.5">
+                <span className="text-xs text-text-muted">{FIELD_LABEL[f]} now</span>
+                <span className="[overflow-wrap:anywhere]">{r.old_value[f] ?? '—'}</span>
+              </div>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="hidden text-text-muted sm:block">
+                <path d="M5 12h14M13 6l6 6-6 6" />
+              </svg>
+              <div className="flex flex-col gap-0.5 rounded-xl bg-surface-raised px-3 py-2.5">
+                <span className="text-xs text-text-muted">Requested</span>
+                <span className="font-semibold [overflow-wrap:anywhere]">{r.new_value[f]}</span>
               </div>
             </div>
-          </div>
-          <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full border-collapse whitespace-nowrap font-mono text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-text-muted">
-                  <th className="px-2 py-2 font-normal sm:px-4">Status</th>
-                  <th className="px-2 py-2 font-normal sm:px-4">Name</th>
-                  <th className="px-2 py-2 font-normal sm:px-4">Clock in</th>
-                  <th className="px-2 py-2 font-normal sm:px-4">Clock out</th>
-                  <th className="px-2 py-2 font-normal sm:px-4">Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {!recordsLoading && records.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-6 text-center text-text-muted">
-                      No records for this period.
-                    </td>
-                  </tr>
-                )}
-                {records.map((record) => (
-                  <tr key={record.id} className="border-b border-border last:border-0">
-                    <td className="px-2 py-2 sm:px-4">
-                      <StatusDot status={record.status} />
-                    </td>
-                    <td className="px-2 py-2 text-text sm:px-4">{record.user_name}</td>
-                    <td className="px-2 py-2 text-text sm:px-4">{formatTimestamp(record.clock_in)}</td>
-                    <td className="px-2 py-2 text-text sm:px-4">{formatTimestamp(record.clock_out)}</td>
-                    <td className="px-2 py-2 text-text-muted sm:px-4">{record.notes ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      </main>
-    </>
+          ))}
+        </div>
+      ),
+      reason: r.reason,
+    }))
+  const resolved = edits
+    .filter((r) => r.status !== 'pending')
+    .map((r) => ({
+      id: r.id,
+      who: r.user_name ?? 'Someone',
+      summary: changedFields(r)
+        .map((f) => `${FIELD_LABEL[f]}: ${r.old_value[f] ?? '—'} → ${r.new_value[f]}`)
+        .join(', '),
+      status: r.awaiting_email_confirmation ? 'awaiting' : r.status,
+    }))
+
+  return (
+    <section aria-label="Profile change requests" className="max-w-[900px]">
+      <ApprovalQueue
+        heading="Profile changes waiting"
+        pending={pending}
+        resolved={resolved}
+        emptyTitle="No profile changes waiting"
+        emptyBody="When someone asks to change their name or email, it shows up here and in your Inbox."
+        onDecide={onDecide}
+        toastFor={(item, approved) =>
+          approved ? `Approved. ${item.who}’s profile is updated (a new email takes effect once they confirm it).` : `Rejected. ${item.who} will see it on their profile.`
+        }
+      />
+    </section>
+  )
+}
+
+function RolesTab({ members, meId, onChange }: { members: UserProfile[]; meId: string; onChange: (updated: UserProfile) => void }) {
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  async function changeRole(userId: string, role: Role) {
+    setError(null)
+    setBusyId(userId)
+    try {
+      onChange(await api.updateUserRole(userId, role))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update role')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const sorted = [...members].sort((a, b) => (a.id === meId ? -1 : b.id === meId ? 1 : a.name.localeCompare(b.name)))
+
+  return (
+    <section aria-label="Team roles" className="flex flex-col gap-3">
+      {error && (
+        <p role="alert" className="m-0 rounded-xl bg-signal-soft px-3.5 py-3 text-sm">
+          {error}
+        </p>
+      )}
+      <div className="overflow-x-auto rounded-[16px] bg-surface">
+        <div className="min-w-[620px] sm:min-w-[760px]">
+          {sorted.map((m) => (
+            <div
+              key={m.id}
+              className="grid min-h-14 grid-cols-[40px_minmax(0,1fr)_120px_170px] items-center gap-x-3.5 gap-y-2 border-b border-border px-4 py-2 last:border-b-0 sm:grid-cols-[40px_minmax(0,1fr)_130px_200px] sm:px-5"
+            >
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-raised text-xs font-semibold">{initials(m.name)}</span>
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate text-sm font-medium">{m.name}</span>
+                <span className="truncate font-mono text-[11px] text-text-muted">{m.email}</span>
+              </span>
+              <span>
+                <span className="inline-flex h-6 items-center whitespace-nowrap rounded-xl border border-border-strong px-2.5 text-xs">{ROLE_LABEL[m.role]}</span>
+              </span>
+              {m.id === meId ? (
+                <span className="flex items-center gap-2 text-xs text-text-muted">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M6 11h12v10H6zM8 11V7a4 4 0 0 1 8 0v4" />
+                  </svg>
+                  Your own role is locked
+                </span>
+              ) : (
+                <select
+                  aria-label={`Role for ${m.name}`}
+                  value={m.role}
+                  disabled={busyId === m.id}
+                  onChange={(e) => changeRole(m.id, e.target.value as Role)}
+                  className="h-11 rounded-[10px] bg-surface-raised px-2.5 text-[13px] text-text disabled:opacity-60"
+                >
+                  {(Object.keys(ROLE_LABEL) as Role[]).map((role) => (
+                    <option key={role} value={role}>
+                      {ROLE_LABEL[role]}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function InviteTab({ readOnly }: { readOnly: boolean }) {
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [sending, setSending] = useState(false)
+  const [sentTo, setSentTo] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault()
+    setError(null)
+    setSentTo(null)
+    setSending(true)
+    try {
+      await api.inviteStaff(email, name)
+      setSentTo(email)
+      setName('')
+      setEmail('')
+    } catch (err) {
+      // The backend's detail is already specific (already registered, rate
+      // limited, …) — show it as-is.
+      setError(err instanceof Error ? err.message : 'Failed to send invite')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const input = `h-[46px] rounded-[10px] border px-3.5 outline-none focus:border-text ${
+    readOnly ? 'border-dashed border-border-strong bg-transparent text-text-muted' : 'border-border bg-bg text-text'
+  }`
+
+  return (
+    <section aria-labelledby="invite-heading" className="flex max-w-[620px] flex-col gap-4 rounded-[16px] bg-surface p-5 sm:px-7 sm:py-6">
+      <h2 id="invite-heading" className="m-0 text-lg font-semibold">
+        Invite a member
+      </h2>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(220px,100%),1fr))] gap-3">
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[13px] text-text-muted">Name</span>
+            <input value={name} onChange={(e) => setName(e.target.value)} required disabled={readOnly} className={input} />
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[13px] text-text-muted">Email</span>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required disabled={readOnly} className={`${input} font-mono text-[13px]`} />
+          </label>
+        </div>
+        <button
+          type="submit"
+          disabled={readOnly || sending}
+          className={`h-12 self-stretch rounded-[10px] px-[22px] font-semibold sm:self-start ${
+            readOnly ? 'cursor-not-allowed bg-surface-raised text-text-muted' : 'bg-action text-on-action disabled:opacity-60'
+          }`}
+        >
+          {sending ? 'Sending…' : 'Send invite'}
+        </button>
+      </form>
+      {sentTo && (
+        <div role="status" className="flex items-start gap-2 rounded-xl bg-status-good-bg px-3.5 py-3 text-sm">
+          <span className="mt-[3px]">
+            <StatusIcon status="approved" size={15} />
+          </span>
+          <span>
+            Invite sent to <span className="[overflow-wrap:anywhere]">{sentTo}</span>. They'll get a link to set their password.
+          </span>
+        </div>
+      )}
+      {error && (
+        <div role="alert" className="flex items-start gap-2 rounded-xl bg-status-warning-bg px-3.5 py-3 text-sm">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mt-[3px] shrink-0 text-status-warning">
+            <path d="M8 2.5l6 11H2zM8 7v3M8 12h.01" />
+          </svg>
+          <span>{error}</span>
+        </div>
+      )}
+    </section>
   )
 }

@@ -51,3 +51,15 @@ export function correctionCard(correction: Correction, tz: string) {
     reason: correction.reason,
   }
 }
+
+// For the admin queues: one line saying what a resolved request was.
+export function leaveSummary(request: LeaveRequest): string {
+  const card = leaveCard(request, 'UTC') // dates are plain dates; the zone is unused
+  return `${card.title} · ${card.fields[0].new}`
+}
+
+export function correctionSummary(correction: Correction, tz: string): string {
+  const card = correctionCard(correction, tz)
+  const changes = card.fields.map((f) => `${f.label.toLowerCase()} ${f.old} → ${f.new}`).join(', ')
+  return `${card.title} · ${changes}`
+}

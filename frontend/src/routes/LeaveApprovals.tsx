@@ -1,104 +1,79 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { api, isAdmin, type LeaveRequest } from '../lib/api'
-import { Skeleton } from '../components/Skeleton'
 import { useMe } from '../lib/me-context'
-import { LeaveRequestsList } from '../components/LeaveRequestsList'
+import { Page } from '../components/Page'
+import { LoadError, Skeleton } from '../components/Skeleton'
+import { ApprovalQueue } from '../components/ApprovalQueue'
+import { FieldRows } from '../components/RequestCard'
+import { formatDateTime } from '../lib/datetime'
+import { leaveCard, leaveSummary } from '../lib/requests'
 
 export function LeaveApprovals() {
-  const { me: profile, refreshNotifications } = useMe()
+  const { me, refreshNotifications } = useMe()
+  const tz = me.org_timezone
+  const [requests, setRequests] = useState<LeaveRequest[]>([])
   const [loaded, setLoaded] = useState(false)
-  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([])
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    setLoading(true)
+    setError(null)
     try {
-      if (!isAdmin(profile)) return
-      setLeaveRequests(await api.leaveRequests())
+      setRequests(await api.leaveRequests())
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load')
     } finally {
-      setLoading(false)
       setLoaded(true)
     }
-  }, [profile])
+  }, [])
 
   useEffect(() => {
-    load()
-  }, [load])
+    if (isAdmin(me)) load()
+  }, [me, load])
 
-  async function handleApprove(id: string) {
-    setError(null)
-    try {
-      await api.approveLeave(id)
-      await load()
-      refreshNotifications()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to approve leave request')
-    }
+  if (!isAdmin(me)) return <Navigate to="/" replace />
+
+  async function decide(id: string, approve: boolean) {
+    await (approve ? api.approveLeave(id) : api.rejectLeave(id))
+    await load()
+    refreshNotifications()
   }
 
-  async function handleReject(id: string) {
-    setError(null)
-    try {
-      await api.rejectLeave(id)
-      await load()
-      refreshNotifications()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reject leave request')
-    }
-  }
-
-  if (!isAdmin(profile)) {
-    return <Navigate to="/" replace />
-  }
-
-  if (!loaded) {
-    return (
-      <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
-        <Skeleton />
-      </main>
-    )
-  }
-
-  const pendingLeaveRequests = leaveRequests.filter((l) => l.status === 'pending')
-  const resolvedLeaveRequests = leaveRequests.filter((l) => l.status !== 'pending')
+  const pending = requests
+    .filter((r) => r.status === 'pending')
+    .map((r) => {
+      const card = leaveCard(r, tz)
+      return {
+        id: r.id,
+        who: r.requested_by_name ?? 'Someone',
+        meta: `${card.title} · sent ${formatDateTime(r.created_at, tz)}`,
+        body: <FieldRows fields={card.fields} />,
+        reason: r.reason,
+      }
+    })
+  const resolved = requests
+    .filter((r) => r.status !== 'pending')
+    .map((r) => ({ id: r.id, who: r.requested_by_name ?? 'Someone', summary: leaveSummary(r), status: r.status }))
 
   return (
-    <>
-      <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
-        <h1 className="mb-4 font-sans text-lg font-semibold text-text">Leave approvals</h1>
-
-        {error && <p className="mb-4 font-mono text-sm text-status-warning">{error}</p>}
-
-        <section className="mb-8">
-          <h2 className="mb-3 font-sans text-sm font-semibold uppercase tracking-wide text-text-muted">
-            Pending
-          </h2>
-          {loading ? (
-            <p className="font-mono text-sm text-text-muted">Loading…</p>
-          ) : (
-            <LeaveRequestsList
-              requests={pendingLeaveRequests}
-              showActions
-              showRequester
-              onApprove={handleApprove}
-              onReject={handleReject}
-            />
-          )}
-        </section>
-
-        {resolvedLeaveRequests.length > 0 && (
-          <section>
-            <h2 className="mb-3 font-sans text-sm font-semibold uppercase tracking-wide text-text-muted">
-              Resolved
-            </h2>
-            <LeaveRequestsList requests={resolvedLeaveRequests} showRequester />
-          </section>
-        )}
-      </main>
-    </>
+    <Page title="Leave approvals" sub={me.org_name} maxWidth={900}>
+      {!loaded ? (
+        <Skeleton />
+      ) : error ? (
+        <LoadError message={error} onRetry={load} />
+      ) : (
+        <ApprovalQueue
+          heading="Waiting for you"
+          pending={pending}
+          resolved={resolved}
+          emptyTitle="All caught up"
+          emptyBody="New requests land here and in your Inbox. Resolved ones stay below for reference."
+          onDecide={decide}
+          toastFor={(item, approved) =>
+            approved ? `Approved. ${item.who}’s leave is now on the calendar.` : `Rejected. ${item.who} will see it in their requests.`
+          }
+        />
+      )}
+    </Page>
   )
 }
