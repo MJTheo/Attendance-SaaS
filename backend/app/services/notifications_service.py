@@ -14,7 +14,7 @@ from app.services.profile_service import ADMIN_LEVEL_ROLES, can_resolve
 MISSED_CLOCKOUT_WINDOW_DAYS = 30
 
 
-def count_notifications(
+def pending_items(
     profile: dict,
     leave_requests: list[dict],
     corrections: list[dict],
@@ -22,37 +22,57 @@ def count_notifications(
     members: list[dict],
     own_records: list[dict],
 ) -> dict:
+    """Everything waiting on this person, oldest first: the Inbox page lists
+    these, and the counts below are their lengths, so the badge and the page
+    always agree."""
     is_admin = profile["role"] in ADMIN_LEVEL_ROLES
     if is_admin:
         admin_level_count = sum(1 for member in members if member["role"] in ADMIN_LEVEL_ROLES)
-        leave_approvals = sum(1 for request in leave_requests if request["status"] == "pending")
-        correction_approvals = sum(1 for correction in corrections if correction["status"] == "pending")
+        leave = [request for request in leave_requests if request["status"] == "pending"]
+        pending_corrections = [correction for correction in corrections if correction["status"] == "pending"]
         # Only the profile changes this admin may actually resolve.
-        profile_changes = sum(
-            1
+        profile_changes = [
+            request
             for request in profile_edits
             if request["status"] == "pending" and can_resolve(profile["id"], request["requested_by"], admin_level_count)
-        )
+        ]
     else:
-        leave_approvals = correction_approvals = profile_changes = 0
+        leave, pending_corrections, profile_changes = [], [], []
 
     corrected = {
         correction["attendance_record_id"]
         for correction in corrections
         if correction["status"] in ("pending", "approved")
     }
-    missed_clockouts = sum(
-        1
+    missed_clockouts = [
+        record
         for record in own_records
         if record["user_id"] == profile["id"] and record["status"] == "missed_clockout" and record["id"] not in corrected
-    )
+    ]
+
+    def oldest_first(rows: list[dict], key: str) -> list[dict]:
+        return sorted(rows, key=lambda row: row.get(key) or "")
+
     return {
-        "leave_approvals": leave_approvals,
-        "correction_approvals": correction_approvals,
-        "profile_changes": profile_changes,
-        "missed_clockouts": missed_clockouts,
-        "total": leave_approvals + correction_approvals + profile_changes + missed_clockouts,
+        "leave": oldest_first(leave, "created_at"),
+        "corrections": oldest_first(pending_corrections, "created_at"),
+        "profile_changes": oldest_first(profile_changes, "created_at"),
+        "missed_clockouts": oldest_first(missed_clockouts, "clock_in"),
     }
+
+
+def count_items(items: dict) -> dict:
+    counts = {
+        "leave_approvals": len(items["leave"]),
+        "correction_approvals": len(items["corrections"]),
+        "profile_changes": len(items["profile_changes"]),
+        "missed_clockouts": len(items["missed_clockouts"]),
+    }
+    return {**counts, "total": sum(counts.values())}
+
+
+def count_notifications(*args, **kwargs) -> dict:
+    return count_items(pending_items(*args, **kwargs))
 
 
 class NotificationsService:
@@ -60,6 +80,9 @@ class NotificationsService:
         self._client = user_client
 
     def for_user(self, profile: dict) -> dict:
+        return count_items(self.inbox(profile))
+
+    def inbox(self, profile: dict) -> dict:
         is_admin = profile["role"] in ADMIN_LEVEL_ROLES
         now = datetime.now(timezone.utc)
         own_records = AttendanceRepository(self._client).list_for_user_range(
@@ -68,7 +91,7 @@ class NotificationsService:
             (now + timedelta(days=1)).isoformat(),
         )
         # RLS scopes these lists: the whole org for admins, your own rows for staff.
-        return count_notifications(
+        return pending_items(
             profile,
             leave_requests=LeaveRequestsRepository(self._client).list_all() if is_admin else [],
             corrections=CorrectionsRepository(self._client).list_all(),

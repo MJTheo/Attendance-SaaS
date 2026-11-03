@@ -58,7 +58,7 @@ Direction B, "warm graphite ledger" — chosen from the Claude Design round of 2
 - **Vermilion is a signal, never a status**: the brand mark, unread counts (Inbox) and errors only.
 - Instrument Sans for UI and headings; IBM Plex Mono for data, timestamps and numeric fields.
 - Borderless cards (16px radius), 10px controls, 44px touch targets on mobile. Dense, information-first layouts — this is an ops tool, not a marketing site.
-- Left sidebar nav (not a top bar), grouped "You" / "Manage", with an Inbox button whose count comes from `GET /notifications`. The shell stays mounted across pages; pages show in-place skeletons while loading. On mobile the sidebar becomes a slide-in drawer behind a hamburger in a 58px top bar. Nav items that combine "my requests" with "approvals" (Leave, Corrections) open a small menu for admins/super admins (there are two places to go, with the queue's count); staff only ever have one place to go, so they get a plain link instead of a pointless one-item menu.
+- Left sidebar nav (not a top bar), grouped "You" / "Manage", with an Inbox button whose count comes from `GET /notifications` and which opens the Inbox page (`/inbox`, one queue for everything waiting on you, from `GET /notifications/inbox`). The shell stays mounted across pages; pages show in-place skeletons while loading. On mobile the sidebar becomes a slide-in drawer behind a hamburger in a 58px top bar. Nav items that combine "my requests" with "approvals" (Leave, Corrections) open a small menu for admins/super admins (there are two places to go, with the queue's count); staff only ever have one place to go, so they get a plain link instead of a pointless one-item menu.
 
 ## Working preferences
 

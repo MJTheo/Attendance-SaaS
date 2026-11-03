@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { SignIn } from './routes/SignIn'
 import { SignUp } from './routes/SignUp'
+import { Inbox } from './routes/Inbox'
 import { Dashboard } from './routes/Dashboard'
 import { Team } from './routes/Team'
 import { Analytics } from './routes/Analytics'
@@ -25,6 +26,7 @@ function App() {
           <Route path="/accept-invite" element={<AcceptInvite />} />
           <Route element={<AppLayout />}>
             <Route path="/" element={<Dashboard />} />
+            <Route path="/inbox" element={<Inbox />} />
             <Route path="/team" element={<Team />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/calendar" element={<Calendar />} />

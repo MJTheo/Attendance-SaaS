@@ -63,6 +63,14 @@ export interface Notifications {
   total: number
 }
 
+// The items behind those counts, oldest first (GET /notifications/inbox).
+export interface Inbox {
+  leave: LeaveRequest[]
+  corrections: Correction[]
+  profile_changes: ProfileEditRequest[]
+  missed_clockouts: AttendanceRecord[]
+}
+
 // super_admin is a superset of admin — everywhere an 'admin' check gates a
 // view or action, a super admin should pass too.
 export function isAdmin(profile: Pick<UserProfile, 'role'>): boolean {
@@ -261,6 +269,7 @@ export const api = {
     }),
   me: () => apiFetch<Me>('/auth/me'),
   notifications: () => apiFetch<Notifications>('/notifications'),
+  inbox: () => apiFetch<Inbox>('/notifications/inbox'),
   clockIn: () => apiFetch<AttendanceRecord>('/attendance/clock-in', { method: 'POST' }),
   clockOut: (notes?: string) =>
     apiFetch<AttendanceRecord>('/attendance/clock-out', {

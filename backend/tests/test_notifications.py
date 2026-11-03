@@ -110,3 +110,50 @@ def test_request_lists_flatten_requester_approver_and_record():
         "id": "c1", "requested_by_name": "Ana", "approved_by_name": "Ben", "record_clock_in": "2026-10-28T00:55:00Z"}
     pending = {"id": "l1", "requester": {"name": "Ana"}, "approver": None}
     assert LeaveRequestsRepository.flatten(pending) == {"id": "l1", "requested_by_name": "Ana", "approved_by_name": None}
+
+
+def test_inbox_lists_the_counted_items_oldest_first(monkeypatch):
+    base = {"org_id": "org-1", "approved_by": None, "resolved_at": None, "reason": "r"}
+    leave = [
+        {**base, "id": "l-new", "user_id": "staff-1", "requested_by": "staff-1", "leave_type": "annual", "start_date": "2026-11-09",
+         "end_date": "2026-11-10", "status": "pending", "created_at": "2026-11-03T02:00:00Z"},
+        {**base, "id": "l-old", "user_id": "staff-1", "requested_by": "staff-1", "leave_type": "sick", "start_date": "2026-11-04",
+         "end_date": "2026-11-04", "status": "pending", "created_at": "2026-11-02T02:00:00Z"},
+        {**base, "id": "l-done", "user_id": "staff-1", "requested_by": "staff-1", "leave_type": "sick", "start_date": "2026-11-01",
+         "end_date": "2026-11-01", "status": "approved", "created_at": "2026-11-01T02:00:00Z"},
+    ]
+    corrections = [{**base, "id": "c1", "attendance_record_id": "rec-x", "requested_by": "staff-1", "old_value": {},
+                    "new_value": {"status": "present"}, "status": "pending", "created_at": "2026-11-02T03:00:00Z"}]
+    edits = [{**base, "id": "p-own", "user_id": "admin-1", "requested_by": "admin-1", "old_value": {"name": "A"},
+              "new_value": {"name": "B"}, "status": "pending", "created_at": "2026-11-02T04:00:00Z"}]
+    missed = [{"id": "rec-m", "org_id": "org-1", "user_id": "admin-1", "clock_in": "2026-11-02T01:00:00Z",
+               "clock_out": "2026-11-02T16:00:00Z", "status": "missed_clockout", "notes": None}]
+
+    class Repo:
+        def __init__(self, client): pass
+        def list_all(self): return leave
+        def list_for_org(self): return [ADMIN, OTHER_ADMIN, STAFF]
+        def list_for_user_range(self, user_id, start, end): return missed
+
+    class Corrections(Repo):
+        def list_all(self): return corrections
+
+    class ProfileEdits(Repo):
+        def list_all(self): return edits
+
+    for name, cls in [("LeaveRequestsRepository", Repo), ("UsersRepository", Repo), ("AttendanceRepository", Repo),
+                      ("CorrectionsRepository", Corrections), ("ProfileEditRequestsRepository", ProfileEdits)]:
+        monkeypatch.setattr(notifications_service, name, cls)
+    app = FastAPI()
+    app.include_router(notifications_router.router)
+    app.dependency_overrides[get_user_client] = lambda: object()
+    app.dependency_overrides[require_profile] = lambda: ADMIN
+    client = TestClient(app)
+
+    inbox = client.get("/notifications/inbox").json()
+    assert [r["id"] for r in inbox["leave"]] == ["l-old", "l-new"]  # oldest first, resolved left out
+    assert [r["id"] for r in inbox["corrections"]] == ["c1"]
+    assert inbox["profile_changes"] == []  # their own, and another admin exists
+    assert [r["id"] for r in inbox["missed_clockouts"]] == ["rec-m"]
+    counts = client.get("/notifications").json()
+    assert counts == {"leave_approvals": 2, "correction_approvals": 1, "profile_changes": 0, "missed_clockouts": 1, "total": 4}

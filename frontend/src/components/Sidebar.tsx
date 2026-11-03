@@ -51,17 +51,6 @@ function useClickOutside(onOutside: () => void) {
   return ref
 }
 
-// Where the Inbox button goes until there's a real Inbox page: the first
-// approval queue with something waiting, or (for staff) the dashboard
-// history, where a missed clock-out's correction is filed.
-function inboxTarget(me: Me, n: Notifications | null): string {
-  if (!isAdmin(me)) return '/'
-  if (!n || n.leave_approvals > 0) return '/approvals/leave'
-  if (n.correction_approvals > 0) return '/approvals/corrections'
-  if (n.profile_changes > 0) return '/team?tab=requests'
-  return '/approvals/leave'
-}
-
 // Labelled theme switch at the foot of the desktop sidebar.
 function ThemeButton() {
   const { theme, toggle, icon } = useTheme()
@@ -134,11 +123,11 @@ function ProfileMenu({ me, onNavigate }: { me: Me; onNavigate: () => void }) {
   )
 }
 
-function InboxButton({ me, notifications, onNavigate }: { me: Me; notifications: Notifications | null; onNavigate: () => void }) {
+function InboxButton({ notifications, onNavigate }: { notifications: Notifications | null; onNavigate: () => void }) {
   const count = notifications?.total ?? 0
   return (
     <Link
-      to={inboxTarget(me, notifications)}
+      to="/inbox"
       onClick={onNavigate}
       className="flex min-h-[42px] items-center gap-2.5 rounded-[10px] bg-signal-soft px-3 text-text"
     >
@@ -251,7 +240,7 @@ export function Sidebar({ me, notifications }: { me: Me; notifications: Notifica
           <Icon d="M4 7h16M4 12h16M4 17h16" size={22} strokeWidth={2} />
         </button>
         <Brand className="flex-1 !text-base" />
-        <Link to={inboxTarget(me, notifications)} aria-label={`Inbox, ${count} waiting`} className="relative flex h-11 w-11 items-center justify-center">
+        <Link to="/inbox" aria-label={`Inbox, ${count} waiting`} className="relative flex h-11 w-11 items-center justify-center">
           <Icon d={ICON.inbox} size={21} />
           {count > 0 && (
             <span className="absolute right-[5px] top-1.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-signal px-1 font-mono text-[10px] font-semibold text-on-signal">
@@ -279,7 +268,7 @@ export function Sidebar({ me, notifications }: { me: Me; notifications: Notifica
           </button>
         </div>
         <ProfileMenu me={me} onNavigate={close} />
-        <InboxButton me={me} notifications={notifications} onNavigate={close} />
+        <InboxButton notifications={notifications} onNavigate={close} />
         <NavItems me={me} notifications={notifications} onNavigate={close} />
         <div className="mt-auto hidden sm:block">
           <ThemeButton />
