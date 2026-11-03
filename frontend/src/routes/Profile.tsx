@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, type ProfileEditRequest, type UserProfile } from '../lib/api'
 import { DEMO_ADMIN_EMAIL } from '../lib/demo'
-import { AppShell } from '../components/AppShell'
+import { Skeleton } from '../components/Skeleton'
+import { useMe } from '../lib/me-context'
 import { ProfileEditsList } from '../components/ProfileEditsList'
 
 const LABEL_CLASS = 'mb-1 block font-mono text-xs uppercase tracking-wide text-text-muted'
@@ -17,7 +18,8 @@ const ROLE_LABEL: Record<UserProfile['role'], string> = {
 }
 
 export function Profile() {
-  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const { me: profile } = useMe()
+  const [loaded, setLoaded] = useState(false)
   const [requests, setRequests] = useState<ProfileEditRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -32,17 +34,16 @@ export function Profile() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const me = await api.me()
-      setProfile(me)
-      setName(me.name)
-      setEmail(me.email)
+      setName(profile.name)
+      setEmail(profile.email)
       setRequests(await api.profileEdits())
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load')
     } finally {
       setLoading(false)
+      setLoaded(true)
     }
-  }, [])
+  }, [profile])
 
   useEffect(() => {
     load()
@@ -81,14 +82,6 @@ export function Profile() {
     }
   }
 
-  if (loading && !profile) {
-    return <div className="flex min-h-screen items-center justify-center text-text-muted">Loading…</div>
-  }
-
-  if (!profile) {
-    return <div className="flex min-h-screen items-center justify-center text-text-muted">Something went wrong.</div>
-  }
-
   // Admins get the whole org's requests from the same endpoint (that's what
   // the Team page's review queue needs) — this page only shows your own.
   const mine = requests.filter((r) => r.user_id === profile.id)
@@ -96,8 +89,16 @@ export function Profile() {
   const awaitingConfirmation = mine.find((r) => r.awaiting_email_confirmation)
   const isDemo = profile.email === DEMO_ADMIN_EMAIL
 
+  if (!loaded) {
+    return (
+      <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
+        <Skeleton />
+      </main>
+    )
+  }
+
   return (
-    <AppShell profile={profile}>
+    <>
       <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
         <h1 className="mb-4 font-sans text-lg font-semibold text-text">My profile</h1>
 
@@ -197,6 +198,6 @@ export function Profile() {
           {loading ? <p className="font-mono text-sm text-text-muted">Loading…</p> : <ProfileEditsList requests={mine} />}
         </section>
       </main>
-    </AppShell>
+    </>
   )
 }

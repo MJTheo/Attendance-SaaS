@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
-import { api, isAdmin, type Organization, type Role, type UserProfile, type Weekday } from '../lib/api'
+import { api, isAdmin, type Organization, type Role, type Weekday } from '../lib/api'
 import { DEMO_ADMIN_EMAIL } from '../lib/demo'
-import { AppShell } from '../components/AppShell'
+import { Skeleton } from '../components/Skeleton'
+import { useMe } from '../lib/me-context'
 
 const WEEKDAYS: { value: Weekday; short: string; full: string }[] = [
   { value: 0, short: 'Mon', full: 'Monday' },
@@ -54,9 +55,9 @@ const SECTION_CLASS = 'mb-8 rounded-lg border border-border bg-surface p-4 sm:p-
 const SECTION_HEADING_CLASS = 'mb-3 font-sans text-sm font-semibold uppercase tracking-wide text-text-muted'
 
 export function Company() {
-  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const { me: profile } = useMe()
+  const [loaded, setLoaded] = useState(false)
   const [org, setOrg] = useState<Organization | null>(null)
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [savingSettings, setSavingSettings] = useState(false)
   const [editingName, setEditingName] = useState(false)
@@ -65,18 +66,15 @@ export function Company() {
   const [nameError, setNameError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    setLoading(true)
     try {
-      const me = await api.me()
-      setProfile(me)
-      if (!isAdmin(me)) return
+      if (!isAdmin(profile)) return
       setOrg(await api.organization())
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load')
     } finally {
-      setLoading(false)
+      setLoaded(true)
     }
-  }, [])
+  }, [profile])
 
   useEffect(() => {
     load()
@@ -137,16 +135,16 @@ export function Company() {
     }
   }
 
-  if (loading && !profile) {
-    return <div className="flex min-h-screen items-center justify-center text-text-muted">Loading…</div>
-  }
-
-  if (!profile) {
-    return <div className="flex min-h-screen items-center justify-center text-text-muted">Something went wrong.</div>
-  }
-
   if (!isAdmin(profile)) {
     return <Navigate to="/" replace />
+  }
+
+  if (!loaded) {
+    return (
+      <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
+        <Skeleton />
+      </main>
+    )
   }
 
   const isDemo = profile.email === DEMO_ADMIN_EMAIL
@@ -155,7 +153,7 @@ export function Company() {
   const canRename = profile.role === 'super_admin' && !isDemo
 
   return (
-    <AppShell profile={profile}>
+    <>
       <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
         <h1 className="mb-4 font-sans text-lg font-semibold text-text">Company</h1>
 
@@ -298,6 +296,6 @@ export function Company() {
           </>
         )}
       </main>
-    </AppShell>
+    </>
   )
 }

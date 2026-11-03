@@ -9,9 +9,10 @@ import {
   type UserProfile,
 } from '../lib/api'
 import { DEMO_ADMIN_EMAIL } from '../lib/demo'
-import { AppShell } from '../components/AppShell'
+import { Skeleton } from '../components/Skeleton'
+import { useMe } from '../lib/me-context'
 import { ProfileEditsList } from '../components/ProfileEditsList'
-import { StatusDot, formatStatusLabel, statusToVariant } from '../components/StatusDot'
+import { StatusDot } from '../components/StatusDot'
 import { formatTimestamp } from '../lib/datetime'
 import { formatPeriodLabel, periodRange, shiftPeriod, type Granularity } from '../lib/period'
 
@@ -38,7 +39,8 @@ function initials(name: string): string {
 }
 
 export function Team() {
-  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const { me: profile, refreshMe, refreshNotifications } = useMe()
+  const [loaded, setLoaded] = useState(false)
   const [records, setRecords] = useState<TeamAttendanceRecord[]>([])
   const [recordsLoading, setRecordsLoading] = useState(true)
   const [loading, setLoading] = useState(true)
@@ -59,17 +61,16 @@ export function Team() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const me = await api.me()
-      setProfile(me)
-      if (!isAdmin(me)) return
+      if (!isAdmin(profile)) return
       setProfileEdits(await api.profileEdits())
-      if (me.role === 'super_admin') setMembers(await api.teamMembers())
+      if (profile.role === 'super_admin') setMembers(await api.teamMembers())
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load')
     } finally {
       setLoading(false)
+      setLoaded(true)
     }
-  }, [])
+  }, [profile])
 
   async function handleRoleChange(userId: string, role: Role) {
     setRoleError(null)
@@ -92,8 +93,11 @@ export function Team() {
       } else {
         await api.rejectProfileEdit(id)
       }
-      // Re-read everything: an approved name shows up in the roles table too.
+      // Re-read everything: an approved name shows up in the roles table too
+      // (and in the sidebar, if it was the sole admin's own change).
       await load()
+      refreshNotifications()
+      refreshMe()
     } catch (err) {
       // e.g. "Another admin has to review your own profile change"
       setProfileEditError(err instanceof Error ? err.message : 'Failed to update request')
@@ -140,20 +144,20 @@ export function Team() {
     }
   }
 
-  if (loading && !profile) {
-    return <div className="flex min-h-screen items-center justify-center text-text-muted">Loading…</div>
-  }
-
-  if (!profile) {
-    return <div className="flex min-h-screen items-center justify-center text-text-muted">Something went wrong.</div>
-  }
-
   if (!isAdmin(profile)) {
     return <Navigate to="/" replace />
   }
 
+  if (!loaded) {
+    return (
+      <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
+        <Skeleton />
+      </main>
+    )
+  }
+
   return (
-    <AppShell profile={profile}>
+    <>
       <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
         <h1 className="mb-4 font-sans text-lg font-semibold text-text">Team</h1>
 
@@ -346,7 +350,7 @@ export function Team() {
                 {records.map((record) => (
                   <tr key={record.id} className="border-b border-border last:border-0">
                     <td className="px-2 py-2 sm:px-4">
-                      <StatusDot variant={statusToVariant(record.status)} label={formatStatusLabel(record.status)} />
+                      <StatusDot status={record.status} />
                     </td>
                     <td className="px-2 py-2 text-text sm:px-4">{record.user_name}</td>
                     <td className="px-2 py-2 text-text sm:px-4">{formatTimestamp(record.clock_in)}</td>
@@ -359,6 +363,6 @@ export function Team() {
           </div>
         </section>
       </main>
-    </AppShell>
+    </>
   )
 }

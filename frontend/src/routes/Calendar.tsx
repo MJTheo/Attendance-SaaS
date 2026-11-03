@@ -10,7 +10,7 @@ import {
   type TeamDayDetail,
   type UserProfile,
 } from '../lib/api'
-import { AppShell } from '../components/AppShell'
+import { useMe } from '../lib/me-context'
 import { Modal } from '../components/Modal'
 import { StatusDot, calendarStatusToVariant, formatStatusLabel, type DotVariant } from '../components/StatusDot'
 import { isoDate, monthGridCells } from '../lib/period'
@@ -30,7 +30,7 @@ function DayDetailBody({ detail }: { detail: DayDetail }) {
   }
   return (
     <div>
-      <StatusDot variant={calendarStatusToVariant(detail.status)} label={formatStatusLabel(detail.status)} />
+      <StatusDot status={detail.status} />
       {detail.leave_type ? (
         <p className="mt-2 font-mono text-sm text-text">{detail.leave_reason}</p>
       ) : detail.status === 'absent' ? (
@@ -54,7 +54,7 @@ function TeamDayDetailBody({ details }: { details: TeamDayDetail[] }) {
           <div className="mb-1 flex items-center justify-between">
             <span className="font-mono text-sm text-text">{detail.name}</span>
             {detail.status ? (
-              <StatusDot variant={calendarStatusToVariant(detail.status)} label={formatStatusLabel(detail.status)} />
+              <StatusDot status={detail.status} />
             ) : (
               <span className="font-mono text-xs text-text-muted">No record</span>
             )}
@@ -77,16 +77,16 @@ const dotColorClass: Record<DotVariant, string> = {
   good: 'bg-status-good',
   warning: 'bg-status-warning',
   neutral: 'bg-status-neutral',
-  info: 'bg-status-info',
-  leave: 'bg-status-leave',
+  sick: 'bg-status-sick',
+  annual: 'bg-status-annual',
 }
 
 const cellBgClass: Record<DotVariant, string> = {
   good: 'bg-status-good-bg',
   warning: 'bg-status-warning-bg',
   neutral: 'bg-status-neutral-bg',
-  info: 'bg-status-info-bg',
-  leave: 'bg-status-leave-bg',
+  sick: 'bg-status-sick-bg',
+  annual: 'bg-status-annual-bg',
 }
 
 const COUNT_KEYS: { key: keyof StatusDistribution; variant: DotVariant; abbr: string }[] = [
@@ -94,8 +94,8 @@ const COUNT_KEYS: { key: keyof StatusDistribution; variant: DotVariant; abbr: st
   { key: 'late', variant: 'warning', abbr: 'L' },
   { key: 'early_leave', variant: 'warning', abbr: 'E' },
   { key: 'absent', variant: 'neutral', abbr: 'A' },
-  { key: 'sick_leave', variant: 'info', abbr: 'S' },
-  { key: 'annual_leave', variant: 'leave', abbr: 'V' },
+  { key: 'sick_leave', variant: 'sick', abbr: 'S' },
+  { key: 'annual_leave', variant: 'annual', abbr: 'V' },
 ]
 
 const WEEKDAY_HEADERS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -229,7 +229,7 @@ function TeamMonthGrid({
 }
 
 export function Calendar() {
-  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const { me: profile } = useMe()
   const [view, setView] = useState<'mine' | 'team'>('mine')
   const [members, setMembers] = useState<UserProfile[]>([])
   const [selectedMemberId, setSelectedMemberId] = useState<string>('')
@@ -247,19 +247,14 @@ export function Calendar() {
   const [dayError, setDayError] = useState<string | null>(null)
 
   useEffect(() => {
-    api.me().then(setProfile).catch(() => setProfile(null))
-  }, [])
-
-  useEffect(() => {
-    if (profile && isAdmin(profile)) {
+    if (isAdmin(profile)) {
       api.teamMembers().then(setMembers).catch(() => setMembers([]))
     }
   }, [profile])
 
-  const drilldown = view === 'team' && !!profile && isAdmin(profile) && selectedMemberId !== ''
+  const drilldown = view === 'team' && isAdmin(profile) && selectedMemberId !== ''
 
   const load = useCallback(async () => {
-    if (!profile) return
     setLoading(true)
     setError(null)
     try {
@@ -281,10 +276,6 @@ export function Calendar() {
     load()
   }, [load])
 
-  if (!profile) {
-    return <div className="flex min-h-screen items-center justify-center text-text-muted">Loading…</div>
-  }
-
   function handleMonthChange(newYear: number, newMonth: number) {
     setYear(newYear)
     setMonth(newMonth)
@@ -302,9 +293,9 @@ export function Calendar() {
     setDayDetail(null)
     setTeamDayDetail(null)
     try {
-      if (view === 'team' && isAdmin(profile!) && !selectedMemberId) {
+      if (view === 'team' && isAdmin(profile) && !selectedMemberId) {
         setTeamDayDetail(await api.teamDay(iso))
-      } else if (view === 'team' && isAdmin(profile!) && selectedMemberId) {
+      } else if (view === 'team' && isAdmin(profile) && selectedMemberId) {
         const all = await api.teamDay(iso)
         setDayDetail(all.find((d) => d.user_id === selectedMemberId) ?? null)
       } else {
@@ -325,7 +316,7 @@ export function Calendar() {
   }
 
   return (
-    <AppShell profile={profile}>
+    <>
       <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -405,6 +396,6 @@ export function Calendar() {
           )}
         </div>
       </main>
-    </AppShell>
+    </>
   )
 }

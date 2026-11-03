@@ -4,7 +4,7 @@ const SERIES: { key: 'present' | 'late' | 'absent' | 'onLeave'; label: string; c
   { key: 'present', label: 'Present', color: 'var(--color-status-good)' },
   { key: 'late', label: 'Late', color: 'var(--color-status-warning)' },
   { key: 'absent', label: 'Absent', color: 'var(--color-status-neutral)' },
-  { key: 'onLeave', label: 'On leave', color: 'var(--color-status-info)' },
+  { key: 'onLeave', label: 'On leave', color: 'var(--color-status-sick)' },
 ]
 
 const WIDTH = 600

@@ -1,21 +1,10 @@
 import type { ProfileEditRequest, ProfileFields } from '../lib/api'
 import { formatTimestamp } from '../lib/datetime'
-import { StatusDot, formatStatusLabel } from './StatusDot'
+import { StatusDot } from './StatusDot'
 
 const FIELD_LABELS: Record<keyof ProfileFields, string> = {
   name: 'Name',
   email: 'Email',
-}
-
-function statusVariant(request: ProfileEditRequest) {
-  if (request.awaiting_email_confirmation) return 'warning' as const
-  if (request.status === 'approved') return 'good' as const
-  if (request.status === 'rejected') return 'neutral' as const
-  return 'warning' as const
-}
-
-function statusLabel(request: ProfileEditRequest) {
-  return request.awaiting_email_confirmation ? 'Approved — email not confirmed yet' : formatStatusLabel(request.status)
 }
 
 export function ProfileEditsList({
@@ -41,7 +30,7 @@ export function ProfileEditsList({
         <div key={request.id} className="rounded-lg border border-border bg-surface p-4">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
             <div className="flex items-center gap-3">
-              <StatusDot variant={statusVariant(request)} label={statusLabel(request)} />
+              <StatusDot status={request.awaiting_email_confirmation ? 'awaiting' : request.status} />
               {showRequester && request.user_name && (
                 <span className="font-mono text-xs text-text-muted">{request.user_name}</span>
               )}

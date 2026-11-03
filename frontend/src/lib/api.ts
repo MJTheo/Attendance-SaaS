@@ -45,6 +45,23 @@ export interface UserProfile {
   email: string
 }
 
+// The signed-in user plus their own org, as GET /auth/me returns it.
+export interface Me extends UserProfile {
+  org_name: string
+  org_plan: string
+  org_timezone: string
+}
+
+// Derived server-side on every read (GET /notifications); drives the
+// sidebar's Inbox badge and the per-queue counts.
+export interface Notifications {
+  leave_approvals: number
+  correction_approvals: number
+  profile_changes: number
+  missed_clockouts: number
+  total: number
+}
+
 // super_admin is a superset of admin — everywhere an 'admin' check gates a
 // view or action, a super admin should pass too.
 export function isAdmin(profile: Pick<UserProfile, 'role'>): boolean {
@@ -230,7 +247,8 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ org_name: orgName, admin_name: adminName, access_code: accessCode }),
     }),
-  me: () => apiFetch<UserProfile>('/auth/me'),
+  me: () => apiFetch<Me>('/auth/me'),
+  notifications: () => apiFetch<Notifications>('/notifications'),
   clockIn: () => apiFetch<AttendanceRecord>('/attendance/clock-in', { method: 'POST' }),
   clockOut: (notes?: string) =>
     apiFetch<AttendanceRecord>('/attendance/clock-out', {

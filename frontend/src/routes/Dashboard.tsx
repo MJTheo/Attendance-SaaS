@@ -1,15 +1,14 @@
 import { Fragment, useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, ApiError, type AttendanceRecord, type CorrectionFields, type DayDetail, type UserProfile } from '../lib/api'
-import { StatusDot, formatStatusLabel, statusToVariant } from '../components/StatusDot'
-import { AppShell } from '../components/AppShell'
+import { api, type AttendanceRecord, type CorrectionFields, type DayDetail } from '../lib/api'
+import { StatusDot } from '../components/StatusDot'
+import { Skeleton } from '../components/Skeleton'
+import { useMe } from '../lib/me-context'
 import { CorrectionRequestForm } from '../components/CorrectionRequestForm'
 import { formatTimestamp } from '../lib/datetime'
-import { Onboarding } from './Onboarding'
 
 export function Dashboard() {
-  const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [needsOnboarding, setNeedsOnboarding] = useState(false)
+  const { refreshNotifications } = useMe()
   const [history, setHistory] = useState<AttendanceRecord[]>([])
   const [streak, setStreak] = useState(0)
   const [todayDetail, setTodayDetail] = useState<DayDetail | null>(null)
@@ -29,16 +28,9 @@ export function Dashboard() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const me = await api.me()
-      setProfile(me)
-      setNeedsOnboarding(false)
       await loadHistory()
     } catch (err) {
-      if (err instanceof ApiError && err.status === 404) {
-        setNeedsOnboarding(true)
-      } else {
-        setActionError(err instanceof Error ? err.message : 'Failed to load')
-      }
+      setActionError(err instanceof Error ? err.message : 'Failed to load')
     } finally {
       setLoading(false)
     }
@@ -49,24 +41,13 @@ export function Dashboard() {
   }, [load])
 
   if (loading) {
-    return <div className="flex min-h-screen items-center justify-center text-text-muted">Loading…</div>
-  }
-
-  if (needsOnboarding) {
     return (
-      <Onboarding
-        onDone={(newProfile) => {
-          setProfile(newProfile)
-          setNeedsOnboarding(false)
-          loadHistory()
-        }}
-      />
+      <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-8">
+        <Skeleton />
+      </main>
     )
   }
 
-  if (!profile) {
-    return <div className="flex min-h-screen items-center justify-center text-text-muted">Something went wrong.</div>
-  }
 
   // status !== 'absent' excludes auto-absent records — those also carry
   // clock_out = null by design (no clock-in ever happened), same reason
@@ -107,18 +88,17 @@ export function Dashboard() {
 
   async function handleRequestCorrection(recordId: string, reason: string, newValue: CorrectionFields) {
     await api.requestCorrection(recordId, reason, newValue)
+    // A correction on a missed clock-out clears it from the inbox count.
+    refreshNotifications()
     setCorrectingRecordId(null)
   }
 
   return (
-    <AppShell profile={profile}>
+    <>
       <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-8">
         <section className="mb-8 rounded-lg border border-border bg-surface p-6 text-center sm:p-10">
           <div className="mb-2 flex justify-center">
-            <StatusDot
-              variant={openRecord ? 'good' : 'neutral'}
-              label={openRecord ? 'Clocked in' : 'Not clocked in'}
-            />
+            <StatusDot status={openRecord ? 'present' : 'absent'} label={openRecord ? 'Clocked in' : 'Not clocked in'} />
           </div>
           <div className="mb-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
             {openRecord && (
@@ -200,7 +180,7 @@ export function Dashboard() {
                   <Fragment key={record.id}>
                     <tr className="border-b border-border last:border-0">
                       <td className="px-2 py-2 sm:px-4">
-                        <StatusDot variant={statusToVariant(record.status)} label={formatStatusLabel(record.status)} />
+                        <StatusDot status={record.status} />
                       </td>
                       <td className="px-2 py-2 text-text sm:px-4">{formatTimestamp(record.clock_in)}</td>
                       <td className="px-2 py-2 text-text sm:px-4">{formatTimestamp(record.clock_out)}</td>
@@ -232,6 +212,6 @@ export function Dashboard() {
           </div>
         </section>
       </main>
-    </AppShell>
+    </>
   )
 }

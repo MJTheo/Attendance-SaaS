@@ -16,12 +16,6 @@ function formatFieldValue(field: keyof CorrectionFields, value: string | undefin
   return value
 }
 
-function statusVariant(status: Correction['status']) {
-  if (status === 'approved') return 'good' as const
-  if (status === 'rejected') return 'neutral' as const
-  return 'warning' as const
-}
-
 export function CorrectionsList({
   corrections,
   showActions = false,
@@ -45,7 +39,7 @@ export function CorrectionsList({
         <div key={correction.id} className="rounded-lg border border-border bg-surface p-4">
           <div className="mb-2 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <StatusDot variant={statusVariant(correction.status)} label={formatStatusLabel(correction.status)} />
+              <StatusDot status={correction.status} />
               {showRequester && correction.requested_by_name && (
                 <span className="font-mono text-xs text-text-muted">{correction.requested_by_name}</span>
               )}

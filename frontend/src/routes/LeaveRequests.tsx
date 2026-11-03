@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api, type LeaveRequest, type UserProfile } from '../lib/api'
-import { AppShell } from '../components/AppShell'
+import { api, type LeaveRequest } from '../lib/api'
+import { Skeleton } from '../components/Skeleton'
+import { useMe } from '../lib/me-context'
 import { LeaveRequestForm } from '../components/LeaveRequestForm'
 import { LeaveRequestsList } from '../components/LeaveRequestsList'
 
 export function LeaveRequests() {
-  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const { me: profile } = useMe()
+  const [loaded, setLoaded] = useState(false)
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([])
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [requestingLeave, setRequestingLeave] = useState(false)
 
@@ -16,15 +17,12 @@ export function LeaveRequests() {
   }, [])
 
   const load = useCallback(async () => {
-    setLoading(true)
     try {
-      const me = await api.me()
-      setProfile(me)
       await loadLeaveRequests()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load')
     } finally {
-      setLoading(false)
+      setLoaded(true)
     }
   }, [loadLeaveRequests])
 
@@ -38,20 +36,20 @@ export function LeaveRequests() {
     await loadLeaveRequests()
   }
 
-  if (loading && !profile) {
-    return <div className="flex min-h-screen items-center justify-center text-text-muted">Loading…</div>
-  }
-
-  if (!profile) {
-    return <div className="flex min-h-screen items-center justify-center text-text-muted">Something went wrong.</div>
-  }
-
   // The endpoint is RLS-scoped so admins see the whole org's requests, not
   // just their own (that's what Leave Approvals needs) — filter to "mine".
   const myLeaveRequests = leaveRequests.filter((l) => l.requested_by === profile.id)
 
+  if (!loaded) {
+    return (
+      <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
+        <Skeleton />
+      </main>
+    )
+  }
+
   return (
-    <AppShell profile={profile}>
+    <>
       <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-8">
         <div className="mb-4 flex items-center justify-between">
           <h1 className="font-sans text-lg font-semibold text-text">Leave requests</h1>
@@ -74,6 +72,6 @@ export function LeaveRequests() {
         )}
         <LeaveRequestsList requests={myLeaveRequests} />
       </main>
-    </AppShell>
+    </>
   )
 }

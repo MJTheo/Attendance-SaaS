@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { api, isAdmin, type Correction, type UserProfile } from '../lib/api'
-import { AppShell } from '../components/AppShell'
+import { api, isAdmin, type Correction } from '../lib/api'
+import { Skeleton } from '../components/Skeleton'
+import { useMe } from '../lib/me-context'
 import { CorrectionsList } from '../components/CorrectionsList'
 
 export function CorrectionApprovals() {
-  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const { me: profile, refreshNotifications } = useMe()
+  const [loaded, setLoaded] = useState(false)
   const [corrections, setCorrections] = useState<Correction[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -13,16 +15,15 @@ export function CorrectionApprovals() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const me = await api.me()
-      setProfile(me)
-      if (!isAdmin(me)) return
+      if (!isAdmin(profile)) return
       setCorrections(await api.corrections())
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load')
     } finally {
       setLoading(false)
+      setLoaded(true)
     }
-  }, [])
+  }, [profile])
 
   useEffect(() => {
     load()
@@ -33,6 +34,7 @@ export function CorrectionApprovals() {
     try {
       await api.approveCorrection(id)
       await load()
+      refreshNotifications()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to approve')
     }
@@ -43,28 +45,29 @@ export function CorrectionApprovals() {
     try {
       await api.rejectCorrection(id)
       await load()
+      refreshNotifications()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to reject')
     }
-  }
-
-  if (loading && !profile) {
-    return <div className="flex min-h-screen items-center justify-center text-text-muted">Loading…</div>
-  }
-
-  if (!profile) {
-    return <div className="flex min-h-screen items-center justify-center text-text-muted">Something went wrong.</div>
   }
 
   if (!isAdmin(profile)) {
     return <Navigate to="/" replace />
   }
 
+  if (!loaded) {
+    return (
+      <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
+        <Skeleton />
+      </main>
+    )
+  }
+
   const pendingCorrections = corrections.filter((c) => c.status === 'pending')
   const resolvedCorrections = corrections.filter((c) => c.status !== 'pending')
 
   return (
-    <AppShell profile={profile}>
+    <>
       <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
         <h1 className="mb-4 font-sans text-lg font-semibold text-text">Correction approvals</h1>
 
@@ -96,6 +99,6 @@ export function CorrectionApprovals() {
           </section>
         )}
       </main>
-    </AppShell>
+    </>
   )
 }

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { api, isAdmin, type Report, type TeamAnalytics, type UserProfile } from '../lib/api'
-import { AppShell } from '../components/AppShell'
+import { api, isAdmin, type Report, type TeamAnalytics } from '../lib/api'
+import { Skeleton } from '../components/Skeleton'
+import { useMe } from '../lib/me-context'
 import { formatTimestamp } from '../lib/datetime'
 import { TrendChart } from '../components/charts/TrendChart'
 import { DonutChart } from '../components/charts/DonutChart'
@@ -12,46 +13,43 @@ function formatPct(rate: number): string {
 }
 
 export function Analytics() {
-  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const { me: profile } = useMe()
+  const [loaded, setLoaded] = useState(false)
   const [analytics, setAnalytics] = useState<TeamAnalytics | null>(null)
   const [reports, setReports] = useState<Report[]>([])
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    setLoading(true)
     try {
-      const me = await api.me()
-      setProfile(me)
-      if (!isAdmin(me)) return
+      if (!isAdmin(profile)) return
       const [analyticsData, reportsData] = await Promise.all([api.analytics(), api.reports()])
       setAnalytics(analyticsData)
       setReports(reportsData)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load')
     } finally {
-      setLoading(false)
+      setLoaded(true)
     }
-  }, [])
+  }, [profile])
 
   useEffect(() => {
     load()
   }, [load])
 
-  if (loading && !profile) {
-    return <div className="flex min-h-screen items-center justify-center text-text-muted">Loading…</div>
-  }
-
-  if (!profile) {
-    return <div className="flex min-h-screen items-center justify-center text-text-muted">Something went wrong.</div>
-  }
-
   if (!isAdmin(profile)) {
     return <Navigate to="/" replace />
   }
 
+  if (!loaded) {
+    return (
+      <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
+        <Skeleton />
+      </main>
+    )
+  }
+
   return (
-    <AppShell profile={profile}>
+    <>
       <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
         <h1 className="mb-4 font-sans text-lg font-semibold text-text">Analytics</h1>
 
@@ -76,8 +74,8 @@ export function Analytics() {
                   { label: 'Late', value: analytics.distribution.late, color: 'var(--color-status-warning)' },
                   { label: 'Early leave', value: analytics.distribution.early_leave, color: 'var(--color-status-warning)' },
                   { label: 'Absent', value: analytics.distribution.absent, color: 'var(--color-status-neutral)' },
-                  { label: 'Sick leave', value: analytics.distribution.sick_leave, color: 'var(--color-status-info)' },
-                  { label: 'Annual leave', value: analytics.distribution.annual_leave, color: 'var(--color-status-leave)' },
+                  { label: 'Sick leave', value: analytics.distribution.sick_leave, color: 'var(--color-status-sick)' },
+                  { label: 'Annual leave', value: analytics.distribution.annual_leave, color: 'var(--color-status-annual)' },
                 ]}
               />
             )}
@@ -183,6 +181,6 @@ export function Analytics() {
           )}
         </section>
       </main>
-    </AppShell>
+    </>
   )
 }

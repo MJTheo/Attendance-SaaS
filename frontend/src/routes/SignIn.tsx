@@ -2,18 +2,20 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { DEMO_ADMIN_EMAIL, DEMO_ADMIN_PASSWORD } from '../lib/demo'
-import { AuthLayout, ErrorText, FormField, SubmitButton } from './AuthLayout'
+import { AuthHeading, AuthLayout, ErrorText, FormField, SecondaryButton, SubmitButton, TextLink } from './AuthLayout'
 
 export function SignIn() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [wrongPassword, setWrongPassword] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [demoSubmitting, setDemoSubmitting] = useState(false)
 
   async function signIn(signInEmail: string, signInPassword: string) {
     setError(null)
+    setWrongPassword(false)
     const { error: signInError } = await supabase.auth.signInWithPassword({
       email: signInEmail,
       password: signInPassword,
@@ -28,7 +30,13 @@ export function SignIn() {
     try {
       await signIn(email, password)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign in failed')
+      const message = err instanceof Error ? err.message : 'Sign in failed'
+      if (/invalid login credentials/i.test(message)) {
+        setWrongPassword(true)
+        setError("That email and password don't match.")
+      } else {
+        setError(message)
+      }
     } finally {
       setSubmitting(false)
     }
@@ -46,40 +54,35 @@ export function SignIn() {
   }
 
   return (
-    <AuthLayout title="Sign in">
-      <form onSubmit={handleSubmit}>
+    <AuthLayout>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-[22px]">
+        <AuthHeading title="Sign in" sub="Welcome back." />
         {error && <ErrorText>{error}</ErrorText>}
-        <FormField
-          label="Email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-        <FormField
-          label="Password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
+        <div className="flex flex-col gap-3.5">
+          <FormField label="Email" type="email" mono autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <FormField
+            label="Password"
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            aria-invalid={wrongPassword}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        </div>
         <SubmitButton disabled={submitting}>{submitting ? 'Signing in…' : 'Sign in'}</SubmitButton>
       </form>
-
-      <div className="my-4 flex items-center gap-3">
-        <div className="h-px flex-1 bg-border" />
-        <span className="font-mono text-xs text-text-muted">or</span>
-        <div className="h-px flex-1 bg-border" />
+      <div className="flex items-center gap-3 text-[13px] text-text-muted">
+        <span className="h-px flex-1 bg-border" />
+        or
+        <span className="h-px flex-1 bg-border" />
       </div>
-
-      <button
-        type="button"
-        onClick={handleDemo}
-        disabled={demoSubmitting}
-        className="w-full rounded-md border border-border px-3 py-2 font-mono text-sm text-text transition-opacity hover:border-status-good hover:text-status-good disabled:opacity-50"
-      >
-        {demoSubmitting ? 'Loading demo…' : 'View live demo'}
-      </button>
+      <SecondaryButton onClick={handleDemo} disabled={demoSubmitting} className="h-[52px] text-base">
+        {demoSubmitting ? 'Opening the demo…' : 'View live demo'}
+      </SecondaryButton>
+      <p className="m-0 text-sm text-text-muted">
+        New here? <TextLink onClick={() => navigate('/signup')}>Create an organization</TextLink>
+      </p>
     </AuthLayout>
   )
 }
