@@ -265,8 +265,9 @@ export function Sidebar({ me, notifications }: { me: Me; notifications: Notifica
       {drawerOpen && <button type="button" aria-label="Close navigation menu" onClick={close} className="fixed inset-0 z-40 bg-overlay sm:hidden" />}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col gap-3.5 overflow-y-auto bg-sidebar px-3 py-3.5 shadow-[var(--shadow-menu)] transition-transform duration-200 sm:sticky sm:top-0 sm:z-auto sm:h-screen sm:w-60 sm:shrink-0 sm:translate-x-0 sm:gap-4 sm:px-3.5 sm:py-[18px] sm:shadow-none sm:transition-none ${
-          drawerOpen ? 'translate-x-0' : '-translate-x-full'
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col gap-3.5 overflow-y-auto bg-sidebar px-3 py-3.5 transition-transform duration-200 sm:sticky sm:top-0 sm:z-auto sm:h-screen sm:w-60 sm:shrink-0 sm:translate-x-0 sm:gap-4 sm:px-3.5 sm:py-[18px] sm:shadow-none sm:transition-none ${
+          // The shadow only while open: off-screen it would still bleed into view.
+          drawerOpen ? 'translate-x-0 shadow-[var(--shadow-menu)]' : '-translate-x-full'
         }`}
       >
         <div className="flex items-center gap-2.5 px-1.5">
