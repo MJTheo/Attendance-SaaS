@@ -50,6 +50,7 @@ export interface Me extends UserProfile {
   org_name: string
   org_plan: string
   org_timezone: string
+  org_working_days: Weekday[]
 }
 
 // Derived server-side on every read (GET /notifications); drives the
@@ -130,6 +131,9 @@ export interface DayStatusCounts extends StatusDistribution {
 export interface CalendarDay {
   date: string
   status: CalendarStatus | null
+  clock_in: string | null
+  clock_out: string | null
+  leave_reason: string | null
 }
 
 export interface DayDetail {
@@ -165,6 +169,7 @@ export interface LeaveRequest {
   status: 'pending' | 'approved' | 'rejected'
   requested_by: string
   requested_by_name: string | null
+  approved_by_name: string | null
   approved_by: string | null
   created_at: string
   resolved_at: string | null
@@ -207,6 +212,8 @@ export interface Correction {
   org_id: string
   requested_by: string
   requested_by_name: string | null
+  approved_by_name: string | null
+  record_clock_in: string | null
   approved_by: string | null
   reason: string
   old_value: CorrectionFields
