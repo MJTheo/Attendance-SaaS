@@ -91,7 +91,7 @@ export function Team() {
               role="tab"
               aria-selected={t.key === tab}
               onClick={() => setParams(t.key === 'attendance' ? {} : { tab: t.key }, { replace: true })}
-              className={`flex h-10 flex-none items-center gap-2 rounded-[9px] px-3.5 text-sm ${t.key === tab ? SEG_ON : SEG_OFF}`}
+              className={`flex h-10 flex-none items-center gap-2 rounded-[9px] px-3.5 text-sm max-sm:h-11 ${t.key === tab ? SEG_ON : SEG_OFF}`}
             >
               {t.label}
               {!!t.count && (
@@ -237,7 +237,7 @@ function AttendanceTab({ members }: { members: UserProfile[] }) {
               type="button"
               aria-pressed={granularity === g}
               onClick={() => setGranularity(g)}
-              className={`h-9 rounded-lg px-3.5 text-[13px] ${granularity === g ? SEG_ON : SEG_OFF}`}
+              className={`h-9 rounded-lg px-3.5 text-[13px] max-sm:h-11 ${granularity === g ? SEG_ON : SEG_OFF}`}
             >
               {{ day: 'Daily', week: 'Weekly', month: 'Monthly' }[g]}
             </button>

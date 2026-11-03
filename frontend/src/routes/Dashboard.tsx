@@ -353,7 +353,7 @@ function History({
         <h2 id="history-heading" className="m-0 text-base font-semibold">
           Recent history
         </h2>
-        <Link to="/calendar" className="px-1 py-2 text-[13px] text-text-muted underline">
+        <Link to="/calendar" className="px-1 py-2 text-[13px] text-text-muted underline max-sm:flex max-sm:min-h-11 max-sm:items-center">
           Open calendar
         </Link>
       </div>

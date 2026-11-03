@@ -116,7 +116,7 @@ function LeaveForm({ today, onSent }: { today: string; onSent: () => Promise<voi
                 type="button"
                 aria-pressed={leaveType === type}
                 onClick={() => setLeaveType(type)}
-                className={`flex h-10 items-center justify-center gap-1.5 rounded-[9px] ${
+                className={`flex h-10 items-center justify-center gap-1.5 rounded-[9px] max-sm:h-11 ${
                   leaveType === type ? 'bg-action font-semibold text-on-action' : 'text-text-muted'
                 }`}
               >

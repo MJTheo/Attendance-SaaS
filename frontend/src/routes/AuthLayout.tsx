@@ -105,7 +105,7 @@ export function ErrorText({ children }: { children: ReactNode }) {
 
 export function TextLink({ children, ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
-    <button type="button" {...props} className="px-0.5 py-2.5 font-semibold text-text underline">
+    <button type="button" {...props} className="px-0.5 py-2.5 font-semibold text-text underline max-sm:min-h-11">
       {children}
     </button>
   )
