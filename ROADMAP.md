@@ -212,12 +212,13 @@ clock out) since all of that is already queryable: pending corrections/leave cou
 a real persisted table later only if you need push notifications or a read/unread history — don't
 build that up front.
 
-### Analytics: absent/week, early-leave/week, cleaner breakdown
-*User's #11.* Two things bundled here: (1) ~~`missed_clockout` missing from the charts~~ — the 30-day
-status distribution and the trend's present rate count it since the redesign (PR #8); the team
-calendar's per-day counts (`DayStatusCounts`) still don't. (2) You want weekly (not just
-30-day-total) breakdowns of absent/early-leave specifically. Both are analytics_service.py + schema
-changes, no new tables.
+### ~~Analytics: absent/week, early-leave/week, cleaner breakdown~~ — done
+*User's #11.* The Analytics page has a **By week** card (absent and early leave per week as grouped
+bars, plus a table of every status and the present rate for each of the last 8 Monday-to-Sunday weeks)
+and a **By person** grid (each member's absences and early leaves per week). `missed_clockout` is now
+in every count, the team calendar's per-day counts included. The team summary covers the same last 30
+days as the rest of the page (it used to count the latest 2,000 records, all-time) and its late rate
+is late ÷ days clocked in. Left as is: the weekday late-rate chart still reads the latest 2,000 records.
 
 ### Late grace period
 *User's#8.* A "clock in up to N minutes after shift start still counts as present" threshold,
@@ -291,8 +292,7 @@ Tier 0 and Tier 1 are done, and so are the Company page and profile edits from T
 order:
 
 1. ~~**Notifications**~~ — done (counts + Inbox page).
-2. **Analytics: weekly breakdowns** (Tier 2, small) — absent/early-leave per week, plus
-   `missed_clockout` in the team calendar's per-day counts (the 30-day charts already count it).
+2. ~~**Analytics: weekly breakdowns**~~ — done (By week, By person, 30-day team summary).
 3. **Tests for `analytics_service.py` and the closeout job** (from "noticed" above, small) — before
    shift times, grace periods, holidays and overtime pile more day-boundary rules onto that code.
 4. **Shift times per employee** (Tier 2, medium–large) — the biggest unlock: real late/absent

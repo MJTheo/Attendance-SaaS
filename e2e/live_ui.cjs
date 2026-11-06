@@ -192,6 +192,8 @@ async function superAdmin(browser) {
   await shot(s, 'super-team')
   const v = await visit(s, '/analytics', 'Analytics')
   check('super', 'Analytics loads cleanly', !v.problems.length, v.problems.join('; '))
+  const analyticsText = await s.page.locator('main').innerText()
+  check('super', 'Analytics shows By week and By person', /By week/.test(analyticsText) && /By person/.test(analyticsText))
   await shot(s, 'super-analytics')
   await s.context.close()
 }

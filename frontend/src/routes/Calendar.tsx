@@ -23,11 +23,12 @@ const WEEKDAY_LONG = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZon
 
 // Legend and team-count order: the groups an admin scans for first.
 const LEGEND: CalendarStatus[] = ['present', 'late', 'early_leave', 'missed_clockout', 'absent', 'sick_leave', 'annual_leave']
-const COUNT_ORDER: (keyof StatusDistribution)[] = ['present', 'late', 'early_leave', 'absent', 'sick_leave', 'annual_leave']
+const COUNT_ORDER: (keyof StatusDistribution)[] = ['present', 'late', 'early_leave', 'missed_clockout', 'absent', 'sick_leave', 'annual_leave']
 const COUNT_WORD: Record<keyof StatusDistribution, string> = {
   present: 'present',
   late: 'late',
   early_leave: 'early',
+  missed_clockout: 'missed',
   absent: 'absent',
   sick_leave: 'sick',
   annual_leave: 'annual',

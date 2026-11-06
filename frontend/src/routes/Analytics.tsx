@@ -8,6 +8,7 @@ import { formatDateRange, formatDateTime, localDate } from '../lib/datetime'
 import { TrendChart } from '../components/charts/TrendChart'
 import { DonutChart } from '../components/charts/DonutChart'
 import { WeekdayBarChart } from '../components/charts/WeekdayBarChart'
+import { WeeklyByPerson, WeeklyChart } from '../components/charts/WeeklyChart'
 
 // Distribution order and colour per status (design B's five meaning groups).
 const DISTRIBUTION: { key: keyof TeamAnalytics['distribution']; color: string }[] = [
@@ -106,20 +107,41 @@ export function Analytics() {
             <WeekdayBarChart data={analytics.by_weekday} />
           </section>
 
+          <section aria-labelledby="weeks-heading" className="flex flex-col gap-3.5 rounded-[16px] bg-surface p-5 sm:px-7 sm:py-6">
+            <div className="flex flex-wrap items-baseline justify-between gap-2.5">
+              <h2 id="weeks-heading" className="m-0 text-base font-semibold">
+                By week
+              </h2>
+              <span className="text-[13px] text-text-muted">Last {analytics.weeks.length} weeks, Monday to Sunday</span>
+            </div>
+            <WeeklyChart weeks={analytics.weeks} />
+          </section>
+
+          <section aria-labelledby="people-weeks-heading" className="flex flex-col rounded-[16px] bg-surface">
+            <div className="flex flex-wrap items-baseline justify-between gap-2.5 px-4 pb-2.5 pt-[18px] sm:px-5">
+              <h2 id="people-weeks-heading" className="m-0 text-base font-semibold">
+                By person
+              </h2>
+              <span className="text-[13px] text-text-muted">Absences and early leaves per week</span>
+            </div>
+            <WeeklyByPerson people={analytics.weeks_by_person} weeks={analytics.weeks} />
+          </section>
+
           <section aria-labelledby="summary-heading" className="flex flex-col rounded-[16px] bg-surface">
             <div className="flex flex-wrap items-baseline justify-between gap-2.5 px-4 pb-2.5 pt-[18px] sm:px-5">
               <h2 id="summary-heading" className="m-0 text-base font-semibold">
                 Team summary
               </h2>
-              <span className="font-mono text-xs text-text-muted">{analytics.users.length} people</span>
+              <span className="font-mono text-xs text-text-muted">Last 30 days · {analytics.users.length} people</span>
             </div>
             <div className={`overflow-auto ${analytics.users.length > 15 ? 'max-h-[520px]' : ''}`}>
-              <div className="min-w-[720px]">
-                <div className="sticky top-0 z-[1] grid h-10 grid-cols-[minmax(200px,1.6fr)_repeat(5,minmax(0,1fr))] items-center gap-2.5 border-b border-border bg-surface px-4 text-xs font-semibold text-text-muted sm:px-5">
+              <div className="min-w-[800px]">
+                <div className="sticky top-0 z-[1] grid h-10 grid-cols-[minmax(200px,1.6fr)_repeat(6,minmax(0,1fr))] items-center gap-2.5 border-b border-border bg-surface px-4 text-xs font-semibold text-text-muted sm:px-5">
                   <span>Name</span>
                   <span className="text-right">Present</span>
                   <span className="text-right">Late</span>
                   <span className="text-right">Early leave</span>
+                  <span className="text-right">Missed clock-out</span>
                   <span className="text-right">Absent</span>
                   <span className="text-right">Late rate</span>
                 </div>
@@ -127,12 +149,13 @@ export function Analytics() {
                 {analytics.users.map((u) => (
                   <div
                     key={u.user_id}
-                    className="grid min-h-11 grid-cols-[minmax(200px,1.6fr)_repeat(5,minmax(0,1fr))] items-center gap-2.5 border-b border-border px-4 font-mono text-[13px] last:border-b-0 sm:px-5"
+                    className="grid min-h-11 grid-cols-[minmax(200px,1.6fr)_repeat(6,minmax(0,1fr))] items-center gap-2.5 border-b border-border px-4 font-mono text-[13px] last:border-b-0 sm:px-5"
                   >
                     <span className="truncate font-sans text-sm">{u.name}</span>
                     <span className="text-right">{u.present}</span>
                     <span className="text-right">{u.late}</span>
                     <span className="text-right">{u.early_leave}</span>
+                    <span className="text-right">{u.missed_clockout}</span>
                     <span className="text-right">{u.absent}</span>
                     <span className={`text-right ${u.late_rate >= LATE_RATE_FLAG ? 'font-semibold text-status-warning' : ''}`}>{pct(u.late_rate)}</span>
                   </div>
