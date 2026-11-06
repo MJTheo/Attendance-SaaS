@@ -1,5 +1,10 @@
 -- Shift times, so a clock-in can be judged late and a clock-out early.
 --
+-- Part 1 of 2, safe to apply BEFORE the backend that uses it: only new
+-- tables and a new enum value, nothing the current backend touches. Part 2
+-- (20261106090100_attendance_writes_via_api.sql) removes staff's direct
+-- writes to attendance_records and must wait until that backend is live.
+--
 -- Admins and super admins choose, per person, either a named shift template
 -- ("Day 08:00–17:00", reusable across people) or custom start/end times. No
 -- assignment row means no shift: that person's clock-ins stay `present` and
@@ -94,18 +99,7 @@ to authenticated
 using (org_id = app.current_org_id() and app.is_admin())
 with check (org_id = app.current_org_id() and app.is_admin());
 
--- ---------- attendance: a new status, and writes only through the API ----------
+-- ---------- attendance: a new status ----------
 
 -- Late in and early out on the same day; a record has one status.
 alter type attendance_status add value 'late_early_leave';
-
--- With shifts, a record's status decides late/early, so it has to be the
--- API's computation, not whatever a client sends. Until now staff could
--- insert their own attendance rows (any clock_in time, any status) and
--- update their open one straight through PostgREST. Clock-in/out now go
--- only through the backend, which computes the status and writes with the
--- service-role client using the caller's verified identity. Reads are
--- unchanged: RLS still scopes every SELECT to the caller's org.
-drop policy "staff can clock in for themselves" on attendance_records;
-drop policy "staff can clock out their own open record" on attendance_records;
-revoke insert, update on attendance_records from authenticated;
