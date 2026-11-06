@@ -13,10 +13,11 @@ class UserAnalyticsSummary(BaseModel):
     present: int
     late: int
     early_leave: int
+    late_early_leave: int = 0
     missed_clockout: int = 0
     absent: int
     total: int
-    # late ÷ days clocked in (present, late, early leave, missed clock-out)
+    # (late + late & early leave) ÷ days clocked in
     late_rate: float
 
 
@@ -35,6 +36,7 @@ class StatusDistribution(BaseModel):
     sick_leave: int
     annual_leave: int
     missed_clockout: int = 0
+    late_early_leave: int = 0
 
 
 class DayStatusCounts(BaseModel):
@@ -46,6 +48,7 @@ class DayStatusCounts(BaseModel):
     sick_leave: int
     annual_leave: int
     missed_clockout: int = 0
+    late_early_leave: int = 0
     present_rate: float | None = None
 
 
@@ -57,6 +60,7 @@ class WeekSummary(BaseModel):
     present: int
     late: int
     early_leave: int
+    late_early_leave: int = 0
     missed_clockout: int
     absent: int
     sick_leave: int

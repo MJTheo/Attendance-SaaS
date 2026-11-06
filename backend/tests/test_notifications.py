@@ -90,7 +90,14 @@ def test_me_includes_org_name_plan_and_timezone(monkeypatch):
         def get(self, org_id): return {"id": org_id, "name": "Demo Company", "plan": "demo", "timezone": "Asia/Manila",
                                        "working_days": [0, 1, 2, 3, 4]}
 
+    class Shifts:
+        def __init__(self, client): pass
+        def get_assignment(self, user_id):
+            return {"user_id": user_id, "template_id": "t1", "custom_start": None, "custom_end": None,
+                    "template": {"name": "Day", "start_time": "08:00:00", "end_time": "17:00:00"}}
+
     monkeypatch.setattr(auth_router, "OrganizationsRepository", Orgs)
+    monkeypatch.setattr(auth_router, "ShiftsRepository", Shifts)
     app = FastAPI()
     app.include_router(auth_router.router)
     app.dependency_overrides[get_user_client] = lambda: object()
@@ -99,6 +106,7 @@ def test_me_includes_org_name_plan_and_timezone(monkeypatch):
     assert body["name"] == "staff-1" and body["role"] == "staff"
     assert (body["org_name"], body["org_plan"], body["org_timezone"]) == ("Demo Company", "demo", "Asia/Manila")
     assert body["org_working_days"] == [0, 1, 2, 3, 4]
+    assert body["shift"] == {"kind": "template", "template_id": "t1", "name": "Day", "start": "08:00", "end": "17:00"}
 
 
 def test_request_lists_flatten_requester_approver_and_record():
