@@ -148,6 +148,10 @@ async function admin(browser) {
   await shot(s, 'admin-company')
   await visit(s, '/team', 'Team')
   check('admin', 'Team: Roles tab hidden', (await s.page.locator('[role=tab]:has-text("Roles")').count()) === 0)
+  await s.page.click('[role=tab]:has-text("Shifts")')
+  check('admin', 'Team: Shifts tab lists templates and people',
+    await s.page.waitForSelector('h2:has-text("Each person")', { timeout: 15000 }).then(() => true, () => false))
+  await visit(s, '/team', 'Team')
   await s.page.click('[role=tab]:has-text("Requests")')
   check('admin', 'Team: profile change queue shown',
     await s.page.waitForSelector('h2:has-text("Profile changes waiting")', { timeout: 15000 }).then(() => true, () => false))
