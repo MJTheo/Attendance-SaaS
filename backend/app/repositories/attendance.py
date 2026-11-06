@@ -41,8 +41,10 @@ class AttendanceRepository:
         )
         return response.data[0]
 
-    def set_clock_out(self, record_id: str, clock_out_at: str, notes: str | None) -> dict:
+    def set_clock_out(self, record_id: str, clock_out_at: str, notes: str | None, status: str | None = None) -> dict:
         payload: dict = {"clock_out": clock_out_at}
+        if status is not None:
+            payload["status"] = status
         if notes is not None:
             payload["notes"] = notes
         response = (

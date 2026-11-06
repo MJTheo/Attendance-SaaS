@@ -222,17 +222,17 @@ is late ÷ days clocked in. Left as is: the weekday late-rate chart still reads 
 
 ### Late grace period
 *User's#8.* A "clock in up to N minutes after shift start still counts as present" threshold,
-configurable per org. **Needs #7 (shift times) first** — there's no "shift start" to be late relative
-to yet; `_determine_clock_in_status()` in `attendance_service.py` is the seam that's been waiting for
-exactly this since Phase 1.
+configurable per org. Shift times exist now; `clock_in_status()` in `attendance_service.py` is where
+the grace minutes apply (and `clock_out_status()`, if early leave should get one too).
 
-### Shift times per employee
-*User's #7.* Set per-employee (or per-role?) expected clock-in/out times, editable by admin/super
-admin. This is the other half of what unlocks real late/absent detection — right now every clock-in
-defaults to `present` because there's nothing to compare against (see the trade-off note in
-`README.md`). Once this exists, `_determine_clock_in_status()` stops being a stub.
-**Open question:** per-user shift assignment, or shift *templates* assignable to users (more scalable
-once a company has more than a handful of staff)?
+### ~~Shift times per employee~~ — done
+*User's #7.* Admins and super admins give each person a **shift template** (reusable, e.g. "Day
+08:00–17:00") or **custom times**, or no shift (Team › Shifts). Clock-in after the start minute is
+`late`, clock-out before the end is `early_leave`, both is the new `late_early_leave`; the closeout job
+records `absent` for people with a shift who didn't clock in on a working day (no approved leave).
+Clock-in/out now write through the API with the service role (staff lost direct DB writes to
+attendance, which allowed back-dating). **Follow-ups:** night shifts that cross midnight (needs a
+"shift date" separate from the calendar day), per-person working days, assignment history.
 
 ### Holiday calendar
 *User's #4.* Public + religious holidays, set by super admin. A `holidays` table
@@ -297,9 +297,8 @@ order:
 2. ~~**Analytics: weekly breakdowns**~~ — done (By week, By person, 30-day team summary).
 3. ~~**Tests for `analytics_service.py` and the closeout job**~~ — done (streaks, day bounds,
    closeout, the clock-in cap; see "Noticed" above).
-4. **Shift times per employee** (Tier 2, medium–large) — the biggest unlock: real late/absent
-   detection. **Decide first:** per-person shifts, or shift templates assigned to people.
-5. **Late grace period** (Tier 2, small once 4 exists).
+4. ~~**Shift times per employee**~~ — done (templates or custom per person; late/early/absent).
+5. **Late grace period** (Tier 2, small) — next.
 6. **Holiday calendar** (Tier 2, medium).
 7. **Overtime tracking** (Tier 3) — needs 4 and 6; scope it down before starting.
 8. **Location check / geofencing** (Tier 3, large) — **decide first:** denied-permission policy,

@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, type AttendanceRecord, type CorrectionFields, type DayDetail } from '../lib/api'
+import { api, type AttendanceRecord, type CorrectionFields, type DayDetail, type Shift } from '../lib/api'
 import { StatusDot } from '../components/StatusDot'
 import { LoadError, Skeleton } from '../components/Skeleton'
 import { Page } from '../components/Page'
@@ -165,6 +165,7 @@ export function Dashboard() {
         error={actionError}
         onClockIn={handleClockIn}
         onClockOut={handleClockOut}
+        shift={todayShift(me.shift, me.org_working_days, now, tz)}
       />
       <History
         records={history.slice(0, HISTORY_ROWS)}
@@ -175,6 +176,15 @@ export function Dashboard() {
       />
     </Page>
   )
+}
+
+const minutesOf = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5))
+
+// The shift only applies on the org's working days (judged in its timezone).
+function todayShift(shift: Shift | null, workingDays: number[], now: Date, tz: string): Shift | null {
+  if (!shift) return null
+  const weekday = (new Date(`${localDate(now, tz)}T12:00:00Z`).getUTCDay() + 6) % 7
+  return workingDays.includes(weekday) ? shift : null
 }
 
 function TodayCard({
@@ -189,7 +199,9 @@ function TodayCard({
   error,
   onClockIn,
   onClockOut,
+  shift,
 }: {
+  shift: Shift | null
   state: TodayState
   tz: string
   now: Date
@@ -246,6 +258,7 @@ function TodayCard({
       : segment
         ? `Today from 06:00 to 22:00: ${chip.label.toLowerCase()} at ${big}${after ? ` ${after}` : ''}`
         : `Today from 06:00 to 22:00, now ${nowTime}`
+  const ariaShift = shift ? `${aria}. Shift ${shift.start} to ${shift.end}` : aria
 
   return (
     <section aria-labelledby="today-heading" className="flex flex-col gap-5 rounded-[16px] bg-surface p-5 sm:px-7 sm:py-6">
@@ -257,6 +270,14 @@ function TodayCard({
           <span className="self-start">
             <StatusDot status={chip.status} label={chip.label} />
           </span>
+          {shift && (
+            <span className="text-[13px] text-text-muted">
+              Shift {shift.kind === 'template' ? `${shift.name} · ` : ''}
+              <span className="font-mono">
+                {shift.start}–{shift.end}
+              </span>
+            </span>
+          )}
         </div>
         <div className="flex flex-wrap items-baseline gap-3 font-mono">
           <span className="text-[44px] font-medium leading-none tracking-[-0.03em]">{big}</span>
@@ -265,7 +286,7 @@ function TodayCard({
         </div>
       </div>
 
-      <div aria-label={aria} role="img" className="flex flex-col gap-2">
+      <div aria-label={ariaShift} role="img" className="flex flex-col gap-2">
         <div className="relative h-8 overflow-hidden rounded-[10px] bg-surface-raised">
           {state === 'onLeave' ? (
             <div
@@ -274,6 +295,13 @@ function TodayCard({
             />
           ) : (
             <>
+              {/* Today's shift: a dashed outline the worked segment fills. */}
+              {shift && (
+                <div
+                  className="absolute inset-y-0 rounded-[6px] border border-dashed border-border-strong"
+                  style={{ left: `${pct(minutesOf(shift.start))}%`, width: `${pct(minutesOf(shift.end)) - pct(minutesOf(shift.start))}%` }}
+                />
+              )}
               {segment && (
                 <div
                   className={`absolute inset-y-0 border-l-2 border-status-good bg-status-good/20 ${segment.closed ? 'border-r-2' : ''}`}

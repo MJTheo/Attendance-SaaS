@@ -2,19 +2,9 @@ import { useState, type FormEvent } from 'react'
 import type { AttendanceRecord, CorrectionFields } from '../lib/api'
 import { addDays, formatTime, localDate, zonedToUtc } from '../lib/datetime'
 import { formatStatusLabel } from './StatusDot'
+import { TIME_INPUT } from '../lib/timeInput'
 
-const STATUS_OPTIONS: AttendanceRecord['status'][] = ['present', 'late', 'early_leave', 'absent', 'missed_clockout']
-
-// 24-hour "HH:MM" like every other time in the app (a native time input
-// would follow the browser's locale and show "06:10 PM").
-const TIME_INPUT = {
-  type: 'text',
-  inputMode: 'numeric',
-  placeholder: 'HH:MM',
-  pattern: '([01][0-9]|2[0-3]):[0-5][0-9]',
-  title: '24-hour time, e.g. 18:10',
-  maxLength: 5,
-} as const
+const STATUS_OPTIONS: AttendanceRecord['status'][] = ['present', 'late', 'early_leave', 'late_early_leave', 'absent', 'missed_clockout']
 
 const FIELD = 'flex flex-col gap-1.5'
 const LABEL = 'text-[13px] text-text-muted'

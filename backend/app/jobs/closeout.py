@@ -1,10 +1,14 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from supabase import Client
 
 from app.repositories.attendance import AttendanceRepository
+from app.repositories.leave_requests import LeaveRequestsRepository
+from app.repositories.organizations import mask_to_days
+from app.repositories.shifts import ShiftsRepository
 from app.services.analytics_service import local_day_bounds
+from app.services.shifts_service import resolve_shift
 
 
 def close_out_previous_day(service_client: Client) -> None:
@@ -15,17 +19,19 @@ def close_out_previous_day(service_client: Client) -> None:
     ongoing shift forever — the staff member requests a correction the next
     day to fix it, same as any other attendance mistake.
 
-    This used to also auto-create a real 'absent' attendance_records row for
-    anyone with no clock-in and no approved leave on a working day. That's
-    deliberately gone: a day with no record at all is meant to read as "no
-    data", not "confirmed absent" — the UI already treats a null status
-    gracefully everywhere (build_personal_calendar, day_detail_for_user), so
-    this was pure removal, not a UI change. Existing auto-absent rows from
-    when this ran are left alone as historical fact rather than
-    backfill-deleted — deleting real historical attendance_records outside
-    the corrections flow would itself violate "no silent edits to attendance
-    records". compute_streak's anchor was the one place that quietly
-    depended on those rows keeping recent days "seen" — see its docstring.
+    It also records absences — but only where a schedule says someone was
+    expected: people with a shift (shift_assignments), on one of the org's
+    working days, with no attendance record that day and no approved leave
+    covering it, whose shift was already set before the day ended. Everyone
+    else's empty day still reads as "no data", not "confirmed absent". (An
+    earlier version auto-created 'absent' rows for everyone, with no
+    schedule to justify it; that was removed, and its old rows are left
+    alone as historical fact rather than backfill-deleted — deleting
+    attendance_records outside the corrections flow would itself violate
+    "no silent edits to attendance records".) An absent row's clock_in is the
+    shift start, its clock_out null; get_open_record ignores absent rows, so
+    one never reads as an open shift. A wrong absence is fixed the normal
+    way, with a correction.
 
     Each org's target day is computed independently from "now in that org's
     timezone minus one day" rather than the job's own (UTC) firing time —
@@ -40,7 +46,7 @@ def close_out_previous_day(service_client: Client) -> None:
     This updates attendance_records.status and clock_out outside the
     corrections flow, which looks like it conflicts with "no silent edits to
     attendance records" — but status is a server-computed field (see
-    AttendanceService._determine_clock_in_status), not a fact the staff
+    attendance_service.clock_in_status/clock_out_status), not a fact the staff
     member reported, and there was no clock_out fact reported yet either.
     This job is completing the clock-out/status computation once the day's
     deadline has passed, the same way a real clock-out already computes it
@@ -52,14 +58,14 @@ def close_out_previous_day(service_client: Client) -> None:
     Service-role only, for the same reason as generate_weekly_reports: no
     authenticated caller to scope RLS to, and needs to iterate every org.
     """
-    orgs = service_client.table("organizations").select("id, timezone").execute().data
+    orgs = service_client.table("organizations").select("id, timezone, working_days").execute().data
     for org in orgs:
         tz = ZoneInfo(org["timezone"])
         target_day = (datetime.now(tz) - timedelta(days=1)).date()
-        _close_out_org_day(service_client, org["id"], target_day, tz)
+        _close_out_org_day(service_client, org["id"], target_day, tz, mask_to_days(org["working_days"]))
 
 
-def _close_out_org_day(service_client: Client, org_id: str, day: date, tz: ZoneInfo) -> None:
+def _close_out_org_day(service_client: Client, org_id: str, day: date, tz: ZoneInfo, working_days: list[int]) -> None:
     attendance = AttendanceRepository(service_client)
     day_start, day_end = local_day_bounds(day, tz)
 
@@ -78,3 +84,31 @@ def _close_out_org_day(service_client: Client, org_id: str, day: date, tz: ZoneI
             attendance.apply_correction(
                 record["id"], {"status": "missed_clockout", "clock_out": day_end.isoformat()}
             )
+
+    if day.weekday() in working_days:
+        _record_absences(service_client, attendance, org_id, day, tz, day_end, org_records)
+
+
+def _record_absences(service_client: Client, attendance: AttendanceRepository, org_id: str, day: date,
+                     tz: ZoneInfo, day_end: datetime, org_records: list[dict]) -> None:
+    assignments = ShiftsRepository(service_client).list_assignments(org_id=org_id)
+    if not assignments:
+        return
+    recorded = {record["user_id"] for record in org_records}
+    on_leave = {
+        leave["user_id"]
+        for leave in LeaveRequestsRepository(service_client).list_approved_in_range(
+            day.isoformat(), day.isoformat(), org_id=org_id
+        )
+    }
+    for assignment in assignments:
+        shift = resolve_shift(assignment)
+        user_id = assignment["user_id"]
+        if shift is None or user_id in recorded or user_id in on_leave:
+            continue
+        # A shift set or changed after the day ended didn't apply to it.
+        if datetime.fromisoformat(assignment["updated_at"]) >= day_end:
+            continue
+        clock_in = datetime.combine(day, time.fromisoformat(shift["start"]), tzinfo=tz)
+        # Same insert as a clock-in, with status 'absent' and no clock_out.
+        attendance.create_clock_in(org_id, user_id, clock_in.isoformat(), "absent")

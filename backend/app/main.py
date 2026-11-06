@@ -9,7 +9,7 @@ from app.dependencies import get_service_role_client
 from app.jobs.closeout import close_out_previous_day
 from app.jobs.reports import generate_weekly_reports
 from app.jobs.schedule import crontab_trigger
-from app.routers import admin, attendance, auth, corrections, leave, notifications, profile
+from app.routers import admin, attendance, auth, corrections, leave, notifications, profile, shifts
 
 settings = get_settings()
 
@@ -52,6 +52,7 @@ app.include_router(leave.router)
 app.include_router(admin.router)
 app.include_router(profile.router)
 app.include_router(notifications.router)
+app.include_router(shifts.router)
 
 
 @app.get("/health")

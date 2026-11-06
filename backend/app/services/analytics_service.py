@@ -5,12 +5,12 @@ from zoneinfo import ZoneInfo
 
 WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
-ATTENDANCE_STATUS_KEYS = ["present", "late", "early_leave", "missed_clockout", "absent"]
+ATTENDANCE_STATUS_KEYS = ["present", "late", "early_leave", "late_early_leave", "missed_clockout", "absent"]
 LEAVE_STATUS_KEYS = ["sick_leave", "annual_leave"]
 ALL_STATUS_KEYS = ATTENDANCE_STATUS_KEYS + LEAVE_STATUS_KEYS
 # Statuses where the person did clock in (late, left early or forgot to clock
 # out still count as in).
-ATTENDED_STATUS_KEYS = ("present", "late", "early_leave", "missed_clockout")
+ATTENDED_STATUS_KEYS = ("present", "late", "early_leave", "late_early_leave", "missed_clockout")
 
 
 def org_timezone(org: dict) -> ZoneInfo:
@@ -45,9 +45,9 @@ def _to_local_date(value: str | datetime, tz: ZoneInfo) -> date:
 def compute_streak(records: list[dict], working_days: set[int] | list[int], tz: ZoneInfo) -> int:
     """Consecutive most-recent calendar days (in the org's own timezone)
     with at least one non-absent record, no gaps. Grounded only in records
-    that actually exist — there's no shift-schedule concept yet (see
-    AttendanceService._determine_clock_in_status), so a day with no record
-    at all isn't assumed to be a missed workday, with one narrow exception:
+    that actually exist (a scheduled absence is a real 'absent' record — the
+    closeout job writes those for people with a shift), so a day with no
+    record at all isn't assumed to be a missed workday, with one narrow exception:
     non-working days (per the org's working_days — a set of weekday
     indices, Monday=0..Sunday=6) are skipped when checking for a gap rather
     than treated as a missed day, since assuming *every* day is a workday
@@ -101,6 +101,7 @@ def summarize_users(team_records: list[dict]) -> list[dict]:
                 "present": 0,
                 "late": 0,
                 "early_leave": 0,
+                "late_early_leave": 0,
                 "missed_clockout": 0,
                 "absent": 0,
                 "total": 0,
@@ -112,7 +113,9 @@ def summarize_users(team_records: list[dict]) -> list[dict]:
     summaries = list(per_user.values())
     for entry in summaries:
         attended = sum(entry[k] for k in ATTENDED_STATUS_KEYS)
-        entry["late_rate"] = round(entry["late"] / attended, 3) if attended else 0.0
+        # Late-and-early-leave days were late too.
+        late = entry["late"] + entry["late_early_leave"]
+        entry["late_rate"] = round(late / attended, 3) if attended else 0.0
     return sorted(summaries, key=lambda entry: entry["name"].lower())
 
 
@@ -125,7 +128,7 @@ def late_rate_by_weekday(team_records: list[dict], working_days: set[int] | list
     for record in team_records:
         weekday = _to_local_date(record["clock_in"], tz).weekday()
         totals[weekday] += 1
-        if record["status"] == "late":
+        if record["status"] in ("late", "late_early_leave"):
             late[weekday] += 1
 
     return [
@@ -258,8 +261,10 @@ def weekly_by_person(records: list[dict], members: list[dict], week_starts: list
     member (no records yet still gets a row of zeros), sorted by name."""
     counts: dict[tuple[str, date], dict[str, int]] = defaultdict(lambda: {"absent": 0, "early_leave": 0})
     for record in records:
-        if record["status"] in ("absent", "early_leave"):
-            counts[(record["user_id"], week_start(_to_local_date(record["clock_in"], tz)))][record["status"]] += 1
+        # A late-and-early-leave day is an early leave too.
+        key = "early_leave" if record["status"] == "late_early_leave" else record["status"]
+        if key in ("absent", "early_leave"):
+            counts[(record["user_id"], week_start(_to_local_date(record["clock_in"], tz)))][key] += 1
     rows = [
         {
             "user_id": member["id"],

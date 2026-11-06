@@ -192,7 +192,11 @@ def db_guards():
     closed = next((r for r in history if r.get("clock_out")), None)
     if closed:
         status, body = stf.db("PATCH", f"/attendance_records?id=eq.{closed['id']}", {"notes": "edited directly"})
-        check("db", "Direct edit of a closed attendance record matches 0 rows (rule 2)", body == [], status)
+        # Refused outright since staff lost UPDATE on attendance (shifts migration); 0 rows before that.
+        check("db", "Direct edit of a closed attendance record refused (rule 2)", status >= 400 or body == [], status)
+    status, _ = stf.db("POST", "/attendance_records", {"org_id": ORG, "user_id": stf.me["id"], "status": "present",
+                                                       "clock_in": "2020-01-01T08:00:00+00:00"})
+    check("db", "Staff can't insert their own attendance row directly (back-dating)", status >= 400, status)
     _, rows = sup.db("GET", f"/organizations?id=eq.{ORG}&select=name,plan")
     check("db", "Re-read: org name and plan unchanged", rows[0] == {"name": ORIGINAL["name"], "plan": ORIGINAL["plan"]})
 
@@ -403,6 +407,42 @@ def inbox():
           all(r["requested_by"] != adm.me["id"] for r in admin_items["profile_changes"]))
 
 
+SHIFT_NAME = "E2E Day"
+
+
+def shifts():
+    # Start clean in case an earlier run stopped half-way.
+    _, existing = sup.api("GET", "/shifts/templates")
+    for t in existing if isinstance(existing, list) else []:
+        if t["name"] == SHIFT_NAME:
+            sup.api("PUT", f"/shifts/people/{stf.me['id']}", {"mode": "none"})
+            sup.api("DELETE", f"/shifts/templates/{t['id']}")
+    status, template = sup.api("POST", "/shifts/templates", {"name": SHIFT_NAME, "start": "08:00", "end": "17:00"})
+    check("shifts", "Super admin creates a shift template", status == 201 and template["people"] == 0, status)
+    check("shifts", "Duplicate template name refused",
+          adm.api("POST", "/shifts/templates", {"name": SHIFT_NAME, "start": "09:00", "end": "18:00"})[0] == 409)
+    check("shifts", "Night shift (crosses midnight) refused for now",
+          adm.api("POST", "/shifts/templates", {"name": "E2E Night", "start": "22:00", "end": "06:00"})[0] == 422)
+    status, shift = adm.api("PUT", f"/shifts/people/{stf.me['id']}", {"mode": "template", "template_id": template["id"]})
+    check("shifts", "Admin assigns the staff member a template", status == 200 and shift["name"] == SHIFT_NAME, status)
+    _, me = stf.api("GET", "/auth/me")
+    check("shifts", "Staff see their own shift on /auth/me", (me.get("shift") or {}).get("start") == "08:00", me.get("shift"))
+    for method, path, body in (("GET", "/shifts/templates", None), ("GET", "/shifts/people", None),
+                               ("PUT", f"/shifts/people/{stf.me['id']}", {"mode": "none"})):
+        check("shifts", f"Staff refused: {method} {path.split('/')[2]}", stf.api(method, path, body)[0] == 403)
+    status, _ = stf.db("POST", "/shift_templates", {"org_id": ORG, "name": "Mine", "start_time": "00:00", "end_time": "00:01"})
+    check("shifts", "Staff can't write shift templates directly (RLS)", status >= 400, status)
+    status, _ = stf.db("POST", "/shift_assignments", {"org_id": ORG, "user_id": stf.me["id"], "custom_start": "00:00", "custom_end": "23:59"})
+    check("shifts", "Staff can't give themselves a shift directly (RLS)", status >= 400, status)
+    check("shifts", "A template in use can't be deleted", sup.api("DELETE", f"/shifts/templates/{template['id']}")[0] == 409)
+    status, shift = adm.api("PUT", f"/shifts/people/{stf.me['id']}", {"mode": "custom", "start": "10:00", "end": "19:00"})
+    check("shifts", "Admin switches them to custom times", status == 200 and shift["name"] == "Custom", status)
+    adm.api("PUT", f"/shifts/people/{stf.me['id']}", {"mode": "none"})
+    check("shifts", "Unused template deleted", sup.api("DELETE", f"/shifts/templates/{template['id']}")[0] == 204)
+    _, me = stf.api("GET", "/auth/me")
+    check("shifts", "Back to no shift", me.get("shift") is None)
+
+
 def analytics():
     _, body = adm.api("GET", "/admin/analytics")
     mondays = [date.fromisoformat(w["week_start"]) for w in body["weeks"]]
@@ -453,7 +493,7 @@ def isolation():
 try:
     for area, fn in [("accounts", accounts), ("gating", gating), ("db", db_guards), ("settings", settings),
                      ("clock", clocking), ("corrections", corrections), ("leave", leave), ("roles", roles),
-                     ("profile", profile_edits), ("inbox", inbox), ("analytics", analytics), ("isolation", isolation)]:
+                     ("profile", profile_edits), ("inbox", inbox), ("shifts", shifts), ("analytics", analytics), ("isolation", isolation)]:
         section(area, fn)
 finally:
     # Put names back if a profile check failed half-way (through the same approval flow).
@@ -462,6 +502,11 @@ finally:
             for pending in (r for r in who.api("GET", "/profile-edits")[1] if r["status"] == "pending" and r["user_id"] == who.me["id"]):
                 approver.api("PATCH", f"/profile-edits/{pending['id']}/reject")
             change_name(who, approver, name, "Restoring my name")
+    sup.api("PUT", f"/shifts/people/{stf.me['id']}", {"mode": "none"})
+    templates = sup.api("GET", "/shifts/templates")[1]
+    for t in templates if isinstance(templates, list) else []:
+        if t["name"] == SHIFT_NAME:
+            sup.api("DELETE", f"/shifts/templates/{t['id']}")
     sup.api("PATCH", "/admin/organization", {"name": ORIGINAL["name"]})
     sup.api("PATCH", "/admin/settings", {"working_days": ORIGINAL["working_days"], "timezone": ORIGINAL["timezone"]})
     sup.api("PATCH", f"/admin/users/{stf.me['id']}/role", {"role": "staff"})

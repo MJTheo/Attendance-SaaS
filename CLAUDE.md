@@ -26,13 +26,15 @@ These are non-negotiable — flag it rather than working around them:
 
 - `organizations` — id, name, plan, created_at, working_days (bitmask of the weekdays this org operates, Monday=0..Sunday=6 — an arbitrary subset, not just "the first N days"), timezone (IANA name, e.g. `Asia/Manila` — defines "today" for the closeout job, the once-per-day clock cap, streaks, and the calendar; not the viewer's own device timezone)
 - `users` — id, org_id (FK), role (admin/staff/super_admin), name, email
-- `attendance_records` — id, org_id, user_id, clock_in, clock_out, status, notes
+- `attendance_records` — id, org_id, user_id, clock_in, clock_out, status, notes. Staff have read-only DB access (RLS-scoped); clock-in/out go through the API, which computes the status and writes with the service-role client
 - `corrections` — id, attendance_record_id, requested_by, approved_by, reason, old_value, new_value, status, created_at
 - `leave_requests` — id, org_id, user_id, leave_type (sick/annual), start_date, end_date, reason, status, requested_by, approved_by, created_at, resolved_at
 - `reports` — id, org_id, type, generated_at, payload
+- `shift_templates` — id, org_id, name, start_time, end_time (same-day: end after start), created_at. Reusable named shifts
+- `shift_assignments` — user_id (PK), org_id, template_id **or** custom_start/custom_end, updated_by, updated_at. Admins/super admins choose per person: a template, custom times, or no row (no shift → never late, early or auto-absent). Current state only; a status is computed at clock-in/out, so changing a shift never rewrites past records
 - `profile_edit_requests` — id, org_id, user_id, requested_by, approved_by, reason, old_value, new_value (name and/or email), status, created_at, resolved_at. Same approval workflow as corrections; nobody approves their own request unless they're the org's only admin-level member. An approved email only takes effect once the user confirms it from the new inbox (the login email lives in Supabase Auth).
 
-Attendance status values: `present`, `late`, `early_leave`, `absent`, `missed_clockout` (auto-flagged by the daily closeout job when a record is still open once its day has ended). Leave is a separate concept (its own table, its own approval workflow) rather than more `attendance_records.status` values — a leave day isn't a clock-in event to correct, it's the deliberate absence of one. Calendar/analytics views surface it alongside attendance status as `sick_leave`/`annual_leave`.
+Attendance status values: `present`, `late` (clock-in after the shift's start minute), `early_leave` (clock-out before the shift's end), `late_early_leave` (both on the same day), `absent` (recorded by the daily closeout job only for people with a shift, on working days, with no record and no approved leave), `missed_clockout` (auto-flagged by the closeout job when a record is still open once its day has ended). Late/early only apply to people with a shift, on the org's working days. Leave is a separate concept (its own table, its own approval workflow) rather than more `attendance_records.status` values — a leave day isn't a clock-in event to correct, it's the deliberate absence of one. Calendar/analytics views surface it alongside attendance status as `sick_leave`/`annual_leave`.
 
 ## Roles
 

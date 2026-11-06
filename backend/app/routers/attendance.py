@@ -4,10 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import Client
 
 from app.core.security import CurrentUser, decode_current_user
-from app.dependencies import get_user_client, require_profile
+from app.dependencies import get_service_role_client, get_user_client, require_profile
 from app.repositories.attendance import AttendanceRepository
 from app.repositories.leave_requests import LeaveRequestsRepository
 from app.repositories.organizations import OrganizationsRepository
+from app.repositories.shifts import ShiftsRepository
 from app.schemas.analytics import CalendarDay, DayDetail, StreakResponse
 from app.schemas.attendance import AttendanceRecord, ClockOutRequest
 from app.services.analytics_service import (
@@ -24,20 +25,30 @@ from app.services.attendance_service import (
     AttendanceService,
     NoOpenRecordError,
 )
+from app.services.shifts_service import resolve_shift
 
 router = APIRouter(prefix="/attendance", tags=["attendance"])
 
 
+def _service_and_context(user_client: Client, profile: dict):
+    """The attendance service (reads as the caller, writes with the service
+    role — staff have no direct write access to attendance_records) plus
+    what the status rules need: the org's timezone and working days, and the
+    caller's own shift, if they have one."""
+    org = OrganizationsRepository(user_client).get(profile["org_id"])
+    shift = resolve_shift(ShiftsRepository(user_client).get_assignment(profile["id"]))
+    service = AttendanceService(AttendanceRepository(user_client), AttendanceRepository(get_service_role_client()))
+    return service, org_timezone(org), org["working_days"], shift
+
+
 @router.post("/clock-in", response_model=AttendanceRecord, status_code=status.HTTP_201_CREATED)
 def clock_in(
-    current_user: CurrentUser = Depends(decode_current_user),
     user_client: Client = Depends(get_user_client),
     profile: dict = Depends(require_profile),
 ):
-    org = OrganizationsRepository(user_client).get(profile["org_id"])
-    service = AttendanceService(AttendanceRepository(user_client))
+    service, tz, working_days, shift = _service_and_context(user_client, profile)
     try:
-        return service.clock_in(profile["org_id"], current_user.id, org_timezone(org))
+        return service.clock_in(profile["org_id"], profile["id"], tz, shift, working_days)
     except AlreadyClockedInError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, "Already clocked in") from exc
     except AlreadyClockedTodayError as exc:
@@ -49,12 +60,12 @@ def clock_in(
 @router.patch("/clock-out", response_model=AttendanceRecord)
 def clock_out(
     payload: ClockOutRequest,
-    current_user: CurrentUser = Depends(decode_current_user),
     user_client: Client = Depends(get_user_client),
+    profile: dict = Depends(require_profile),
 ):
-    service = AttendanceService(AttendanceRepository(user_client))
+    service, tz, working_days, shift = _service_and_context(user_client, profile)
     try:
-        return service.clock_out(current_user.id, payload.notes)
+        return service.clock_out(profile["id"], payload.notes, tz, shift, working_days)
     except NoOpenRecordError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, "No open clock-in to close") from exc
 
