@@ -3,7 +3,8 @@ import { formatWeek } from '../../lib/datetime'
 import { StatusIcon, formatStatusLabel } from '../StatusDot'
 
 // The two exceptions the weekly views track, each in its own status colour
-// and always shown with its icon and label (never colour alone).
+// and always shown with its icon and label (never colour alone). Days that
+// were late and left early count as early leaves here.
 const SERIES = [
   { key: 'absent', bar: 'bg-status-neutral' },
   { key: 'early_leave', bar: 'bg-status-warning' },
@@ -42,7 +43,8 @@ function Legend() {
 
 // Absences and early leaves per week for the whole team (grouped bars, one
 // scale), with the full weekly counts in a table beside them.
-export function WeeklyChart({ weeks }: { weeks: WeekSummary[] }) {
+export function WeeklyChart({ weeks: raw }: { weeks: WeekSummary[] }) {
+  const weeks = raw.map((w) => ({ ...w, early_leave: w.early_leave + w.late_early_leave }))
   const max = Math.max(1, ...weeks.flatMap((w) => [w.absent, w.early_leave]))
   return (
     <div className="flex flex-col gap-4">
@@ -80,20 +82,21 @@ export function WeeklyChart({ weeks }: { weeks: WeekSummary[] }) {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[640px] border-collapse text-[13px]">
+        <table className="w-full min-w-[720px] border-collapse text-[13px]">
           <thead>
             <tr className="text-xs font-semibold text-text-muted">
               <th className="py-1.5 text-left font-semibold">Week</th>
               <th className="py-1.5 text-right font-semibold">Present rate</th>
               <th className="py-1.5 text-right font-semibold">Late</th>
               <th className="py-1.5 text-right font-semibold">Early leave</th>
+              <th className="py-1.5 text-right font-semibold">Late & early</th>
               <th className="py-1.5 text-right font-semibold">Missed clock-out</th>
               <th className="py-1.5 text-right font-semibold">Absent</th>
               <th className="py-1.5 text-right font-semibold">On leave</th>
             </tr>
           </thead>
           <tbody className="font-mono">
-            {[...weeks].reverse().map((w) => {
+            {[...raw].reverse().map((w) => {
               const empty = w.present_rate === null
               const n = (v: number) => (empty ? '—' : v)
               return (
@@ -105,6 +108,7 @@ export function WeeklyChart({ weeks }: { weeks: WeekSummary[] }) {
                   <td className="py-2 text-right">{empty ? '—' : `${Math.round((w.present_rate ?? 0) * 100)}%`}</td>
                   <td className="py-2 text-right">{n(w.late)}</td>
                   <td className="py-2 text-right">{n(w.early_leave)}</td>
+                  <td className="py-2 text-right">{n(w.late_early_leave)}</td>
                   <td className="py-2 text-right">{n(w.missed_clockout)}</td>
                   <td className="py-2 text-right">{n(w.absent)}</td>
                   <td className="py-2 text-right">{n(w.sick_leave + w.annual_leave)}</td>

@@ -22,12 +22,13 @@ const MONTH_LONG = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'nume
 const WEEKDAY_LONG = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' })
 
 // Legend and team-count order: the groups an admin scans for first.
-const LEGEND: CalendarStatus[] = ['present', 'late', 'early_leave', 'missed_clockout', 'absent', 'sick_leave', 'annual_leave']
-const COUNT_ORDER: (keyof StatusDistribution)[] = ['present', 'late', 'early_leave', 'missed_clockout', 'absent', 'sick_leave', 'annual_leave']
+const LEGEND: CalendarStatus[] = ['present', 'late', 'early_leave', 'late_early_leave', 'missed_clockout', 'absent', 'sick_leave', 'annual_leave']
+const COUNT_ORDER: (keyof StatusDistribution)[] = ['present', 'late', 'early_leave', 'late_early_leave', 'missed_clockout', 'absent', 'sick_leave', 'annual_leave']
 const COUNT_WORD: Record<keyof StatusDistribution, string> = {
   present: 'present',
   late: 'late',
   early_leave: 'early',
+  late_early_leave: 'late+early',
   missed_clockout: 'missed',
   absent: 'absent',
   sick_leave: 'sick',
@@ -369,7 +370,7 @@ function DayPanel({
       byStatus.set(d.status, list)
     }
     // Exceptions first, then who was simply present.
-    const order: CalendarStatus[] = ['late', 'early_leave', 'missed_clockout', 'absent', 'sick_leave', 'annual_leave', 'present']
+    const order: CalendarStatus[] = ['late', 'early_leave', 'late_early_leave', 'missed_clockout', 'absent', 'sick_leave', 'annual_leave', 'present']
     groups = order.filter((s) => byStatus.has(s)).map((s) => ({ status: s, people: byStatus.get(s)! }))
     sub = `${byStatus.get('present')?.length ?? 0} of ${teamDetail.length} present`
   } else if (!teamAggregate && personal?.status) {

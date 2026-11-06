@@ -15,6 +15,7 @@ const DISTRIBUTION: { key: keyof TeamAnalytics['distribution']; color: string }[
   { key: 'present', color: 'var(--color-status-good)' },
   { key: 'late', color: 'var(--color-status-warning)' },
   { key: 'early_leave', color: 'var(--color-status-warning)' },
+  { key: 'late_early_leave', color: 'var(--color-status-warning)' },
   { key: 'missed_clockout', color: 'var(--color-status-warning)' },
   { key: 'absent', color: 'var(--color-status-neutral)' },
   { key: 'sick_leave', color: 'var(--color-status-sick)' },
@@ -135,12 +136,13 @@ export function Analytics() {
               <span className="font-mono text-xs text-text-muted">Last 30 days · {analytics.users.length} people</span>
             </div>
             <div className={`overflow-auto ${analytics.users.length > 15 ? 'max-h-[520px]' : ''}`}>
-              <div className="min-w-[800px]">
-                <div className="sticky top-0 z-[1] grid h-10 grid-cols-[minmax(200px,1.6fr)_repeat(6,minmax(0,1fr))] items-center gap-2.5 border-b border-border bg-surface px-4 text-xs font-semibold text-text-muted sm:px-5">
+              <div className="min-w-[880px]">
+                <div className="sticky top-0 z-[1] grid h-10 grid-cols-[minmax(200px,1.6fr)_repeat(7,minmax(0,1fr))] items-center gap-2.5 border-b border-border bg-surface px-4 text-xs font-semibold text-text-muted sm:px-5">
                   <span>Name</span>
                   <span className="text-right">Present</span>
                   <span className="text-right">Late</span>
                   <span className="text-right">Early leave</span>
+                  <span className="text-right">Late & early</span>
                   <span className="text-right">Missed clock-out</span>
                   <span className="text-right">Absent</span>
                   <span className="text-right">Late rate</span>
@@ -149,12 +151,13 @@ export function Analytics() {
                 {analytics.users.map((u) => (
                   <div
                     key={u.user_id}
-                    className="grid min-h-11 grid-cols-[minmax(200px,1.6fr)_repeat(6,minmax(0,1fr))] items-center gap-2.5 border-b border-border px-4 font-mono text-[13px] last:border-b-0 sm:px-5"
+                    className="grid min-h-11 grid-cols-[minmax(200px,1.6fr)_repeat(7,minmax(0,1fr))] items-center gap-2.5 border-b border-border px-4 font-mono text-[13px] last:border-b-0 sm:px-5"
                   >
                     <span className="truncate font-sans text-sm">{u.name}</span>
                     <span className="text-right">{u.present}</span>
                     <span className="text-right">{u.late}</span>
                     <span className="text-right">{u.early_leave}</span>
+                    <span className="text-right">{u.late_early_leave}</span>
                     <span className="text-right">{u.missed_clockout}</span>
                     <span className="text-right">{u.absent}</span>
                     <span className={`text-right ${u.late_rate >= LATE_RATE_FLAG ? 'font-semibold text-status-warning' : ''}`}>{pct(u.late_rate)}</span>

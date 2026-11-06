@@ -32,6 +32,8 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
     throw new ApiError(response.status, body?.detail ?? response.statusText)
   }
 
+  // 204 No Content (e.g. deleting a shift template) has no body to parse.
+  if (response.status === 204) return undefined as T
   return response.json() as Promise<T>
 }
 
@@ -51,7 +53,39 @@ export interface Me extends UserProfile {
   org_plan: string
   org_timezone: string
   org_working_days: Weekday[]
+  // The caller's own shift, or null (no late/early detection for them).
+  shift: Shift | null
 }
+
+// A person's shift: a template's name and times, or "Custom". Times are
+// "HH:MM" in the org's timezone; shifts are same-day (end after start).
+export interface Shift {
+  kind: 'template' | 'custom'
+  template_id: string | null
+  name: string
+  start: string
+  end: string
+}
+
+export interface ShiftTemplate {
+  id: string
+  name: string
+  start: string
+  end: string
+  people: number
+}
+
+export interface PersonShift {
+  user_id: string
+  name: string
+  role: Role
+  shift: Shift | null
+}
+
+export type SetPersonShift =
+  | { mode: 'none' }
+  | { mode: 'template'; template_id: string }
+  | { mode: 'custom'; start: string; end: string }
 
 // Derived server-side on every read (GET /notifications); drives the
 // sidebar's Inbox badge and the per-queue counts.
@@ -83,7 +117,7 @@ export interface AttendanceRecord {
   user_id: string
   clock_in: string
   clock_out: string | null
-  status: 'present' | 'late' | 'early_leave' | 'absent' | 'missed_clockout'
+  status: 'present' | 'late' | 'early_leave' | 'late_early_leave' | 'absent' | 'missed_clockout'
   notes: string | null
 }
 
@@ -108,6 +142,7 @@ export interface UserAnalyticsSummary {
   present: number
   late: number
   early_leave: number
+  late_early_leave: number
   missed_clockout: number
   absent: number
   total: number
@@ -133,6 +168,7 @@ export interface StatusDistribution {
   sick_leave: number
   annual_leave: number
   missed_clockout: number
+  late_early_leave: number
 }
 
 export interface DayStatusCounts extends StatusDistribution {
@@ -362,4 +398,13 @@ export const api = {
   myDay: (isoDate: string) => apiFetch<DayDetail>(`/attendance/day/${isoDate}`),
   myToday: () => apiFetch<DayDetail>('/attendance/today'),
   teamDay: (isoDate: string) => apiFetch<TeamDayDetail[]>(`/admin/day/${isoDate}`),
+  shiftTemplates: () => apiFetch<ShiftTemplate[]>('/shifts/templates'),
+  createShiftTemplate: (template: { name: string; start: string; end: string }) =>
+    apiFetch<ShiftTemplate>('/shifts/templates', { method: 'POST', body: JSON.stringify(template) }),
+  updateShiftTemplate: (id: string, template: { name: string; start: string; end: string }) =>
+    apiFetch<ShiftTemplate>(`/shifts/templates/${id}`, { method: 'PATCH', body: JSON.stringify(template) }),
+  deleteShiftTemplate: (id: string) => apiFetch<void>(`/shifts/templates/${id}`, { method: 'DELETE' }),
+  peopleShifts: () => apiFetch<PersonShift[]>('/shifts/people'),
+  setPersonShift: (userId: string, shift: SetPersonShift) =>
+    apiFetch<Shift | null>(`/shifts/people/${userId}`, { method: 'PUT', body: JSON.stringify(shift) }),
 }

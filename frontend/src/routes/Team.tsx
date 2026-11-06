@@ -13,13 +13,14 @@ import { useMe } from '../lib/me-context'
 import { Page } from '../components/Page'
 import { LoadError, Skeleton } from '../components/Skeleton'
 import { ApprovalQueue } from '../components/ApprovalQueue'
+import { ShiftsTab } from '../components/ShiftsTab'
 import { PROFILE_FIELD_LABEL, changedFields, profileItem, profileToast } from '../components/approvalItems'
 import { StatusIcon, formatStatusLabel } from '../components/StatusDot'
 import { addDays, formatDayLong, formatDayShort, formatTime, formatWeek, localDate, mondayOf, zonedToUtc } from '../lib/datetime'
 
 const ROLE_LABEL: Record<Role, string> = { staff: 'Staff', admin: 'Admin', super_admin: 'Super admin' }
 
-type Tab = 'attendance' | 'requests' | 'roles' | 'invite'
+type Tab = 'attendance' | 'requests' | 'shifts' | 'roles' | 'invite'
 type Granularity = 'day' | 'week' | 'month'
 
 const SEG_ON = 'bg-action font-semibold text-on-action'
@@ -65,6 +66,7 @@ export function Team() {
   const tabs: { key: Tab; label: string; count?: number }[] = [
     { key: 'attendance', label: 'Attendance' },
     { key: 'requests', label: 'Requests', count: notifications?.profile_changes },
+    { key: 'shifts', label: 'Shifts' },
     ...(isSuper ? [{ key: 'roles' as const, label: 'Roles' }] : []),
     { key: 'invite', label: 'Invite' },
   ]
@@ -96,6 +98,8 @@ export function Team() {
 
       {tab === 'attendance' ? (
         <AttendanceTab members={members} />
+      ) : tab === 'shifts' ? (
+        <ShiftsTab readOnly={isDemo} />
       ) : !loaded ? (
         <Skeleton />
       ) : error ? (
