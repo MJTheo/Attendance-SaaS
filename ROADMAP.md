@@ -263,16 +263,18 @@ discussion: single office location, or multiple? Remote/hybrid staff exemption?
 
 ## Noticed but not on your list
 
-- **Automated tests — started, still thin.** A pytest suite now exists (`backend/tests`,
-  `requirements-dev.txt`; runs with no Supabase, repositories faked via `monkeypatch` +
-  FastAPI `dependency_overrides`). It covers org schemas, the working-days mask, and the
-  Company page routes' role gating. A live end-to-end suite (`e2e/`) now also runs against
-  production as a super admin, admin and staff member in a dedicated test org — role gating, the
-  DB triggers/RLS hit directly, corrections, leave, timezone, profile edits, and tenant isolation.
-  Still missing, and the most valuable next: `analytics_service.py`
-  (streaks, timezone day-bucketing) and the closeout job — two real bugs shipped there before
-  (auto-`absent` records blocking future clock-ins, twice) and grace periods/overtime/holidays will
-  add more day-boundary logic on top.
+- **Automated tests — the day-boundary core is now covered.** A pytest suite (`backend/tests`,
+  `requirements-dev.txt`; runs with no Supabase, repositories faked via `monkeypatch` + FastAPI
+  `dependency_overrides`, "now" frozen with the `frozen_now` fixture in `conftest.py`) covers org
+  schemas, the working-days mask, route role gating, notifications/Inbox, profile edits, the report
+  schedule, and — since 2026-11-06 — `analytics_service.py` (streaks incl. arbitrary working days and
+  org-local day bucketing, weekday late rates, DST day bounds, leave clipping, weekly views, day
+  detail), the closeout job (each org's own yesterday; only open, unflagged records get flagged; no
+  rows created) and clocking (the once-per-org-local-day cap; the auto-`absent` filter that once
+  blocked clock-ins). A live end-to-end suite (`e2e/`) runs against production as a super admin,
+  admin and staff member in a dedicated test org — role gating, the DB triggers/RLS hit directly,
+  corrections, leave, timezone, profile edits, Inbox, analytics and tenant isolation. Still thin:
+  `jobs/reports.py` and the invite flow.
 - **Demo org data is date-backdated from a fixed seed point** and will look increasingly stale as real
   time passes. Eventually worth a small script to keep the trailing ~30 days populated automatically,
   or accept it as a periodic manual touch-up.
@@ -293,8 +295,8 @@ order:
 
 1. ~~**Notifications**~~ — done (counts + Inbox page).
 2. ~~**Analytics: weekly breakdowns**~~ — done (By week, By person, 30-day team summary).
-3. **Tests for `analytics_service.py` and the closeout job** (from "noticed" above, small) — before
-   shift times, grace periods, holidays and overtime pile more day-boundary rules onto that code.
+3. ~~**Tests for `analytics_service.py` and the closeout job**~~ — done (streaks, day bounds,
+   closeout, the clock-in cap; see "Noticed" above).
 4. **Shift times per employee** (Tier 2, medium–large) — the biggest unlock: real late/absent
    detection. **Decide first:** per-person shifts, or shift templates assigned to people.
 5. **Late grace period** (Tier 2, small once 4 exists).
