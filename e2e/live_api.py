@@ -403,6 +403,20 @@ def inbox():
           all(r["requested_by"] != adm.me["id"] for r in admin_items["profile_changes"]))
 
 
+def analytics():
+    _, body = adm.api("GET", "/admin/analytics")
+    mondays = [date.fromisoformat(w["week_start"]) for w in body["weeks"]]
+    check("analytics", "8 Monday-start weeks, oldest first, last one in progress or just ended",
+          len(mondays) == 8 and all(m.weekday() == 0 for m in mondays)
+          and all((b - a).days == 7 for a, b in zip(mondays, mondays[1:])), [m.isoformat() for m in mondays])
+    _, members = adm.api("GET", "/admin/users")
+    check("analytics", "A per-person weekly row for every member",
+          {p["user_id"] for p in body["weeks_by_person"]} == {m["id"] for m in members}
+          and all(len(p["weeks"]) == 8 for p in body["weeks_by_person"]))
+    check("analytics", "Team summary late rate stays within 0–1",
+          all(0 <= u["late_rate"] <= 1 and "missed_clockout" in u for u in body["users"]))
+
+
 def isolation():
     tables = {"organizations": "id", "users": "org_id", "attendance_records": "org_id",
               "corrections": "org_id", "leave_requests": "org_id", "reports": "org_id",
@@ -439,7 +453,7 @@ def isolation():
 try:
     for area, fn in [("accounts", accounts), ("gating", gating), ("db", db_guards), ("settings", settings),
                      ("clock", clocking), ("corrections", corrections), ("leave", leave), ("roles", roles),
-                     ("profile", profile_edits), ("inbox", inbox), ("isolation", isolation)]:
+                     ("profile", profile_edits), ("inbox", inbox), ("analytics", analytics), ("isolation", isolation)]:
         section(area, fn)
 finally:
     # Put names back if a profile check failed half-way (through the same approval flow).

@@ -108,8 +108,10 @@ export interface UserAnalyticsSummary {
   present: number
   late: number
   early_leave: number
+  missed_clockout: number
   absent: number
   total: number
+  // late ÷ days clocked in (computed server-side)
   late_rate: number
 }
 
@@ -130,6 +132,7 @@ export interface StatusDistribution {
   absent: number
   sick_leave: number
   annual_leave: number
+  missed_clockout: number
 }
 
 export interface DayStatusCounts extends StatusDistribution {
@@ -165,10 +168,25 @@ export interface TeamDayDetail extends DayDetail {
 export interface TeamAnalytics {
   users: UserAnalyticsSummary[]
   by_weekday: WeekdayLateRate[]
-  // The 30-day totals also count missed clock-outs (the calendar's
-  // per-day counts don't).
-  distribution: StatusDistribution & { missed_clockout: number }
+  distribution: StatusDistribution
   trend: DayStatusCounts[]
+  // The last 8 Monday-start weeks in the org's timezone, oldest first; the
+  // last one is the week in progress.
+  weeks: WeekSummary[]
+  weeks_by_person: PersonWeeks[]
+}
+
+export interface WeekSummary extends StatusDistribution {
+  week_start: string
+  week_end: string
+  partial: boolean
+  present_rate: number | null
+}
+
+export interface PersonWeeks {
+  user_id: string
+  name: string
+  weeks: { week_start: string; absent: number; early_leave: number }[]
 }
 
 export interface LeaveRequest {

@@ -5,9 +5,12 @@ from zoneinfo import ZoneInfo
 
 WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
-ATTENDANCE_STATUS_KEYS = ["present", "late", "early_leave", "absent"]
+ATTENDANCE_STATUS_KEYS = ["present", "late", "early_leave", "missed_clockout", "absent"]
 LEAVE_STATUS_KEYS = ["sick_leave", "annual_leave"]
 ALL_STATUS_KEYS = ATTENDANCE_STATUS_KEYS + LEAVE_STATUS_KEYS
+# Statuses where the person did clock in (late, left early or forgot to clock
+# out still count as in).
+ATTENDED_STATUS_KEYS = ("present", "late", "early_leave", "missed_clockout")
 
 
 def org_timezone(org: dict) -> ZoneInfo:
@@ -82,9 +85,11 @@ def compute_streak(records: list[dict], working_days: set[int] | list[int], tz: 
 
 
 def summarize_users(team_records: list[dict]) -> list[dict]:
-    """Per-user status breakdown across whatever records are passed in.
-    team_records is expected in AttendanceRepository.list_for_org shape
-    (includes a flattened user_name field)."""
+    """Per-user status breakdown across whatever records are passed in (the
+    analytics page passes its trailing 30 days). team_records is expected in
+    AttendanceRepository.list_for_org shape (includes a flattened user_name
+    field). The late rate is late ÷ days they clocked in — an absence isn't
+    an on-time day, so it doesn't dilute the rate."""
     per_user: dict[str, dict] = {}
     for record in team_records:
         user_id = record["user_id"]
@@ -96,6 +101,7 @@ def summarize_users(team_records: list[dict]) -> list[dict]:
                 "present": 0,
                 "late": 0,
                 "early_leave": 0,
+                "missed_clockout": 0,
                 "absent": 0,
                 "total": 0,
             },
@@ -105,8 +111,9 @@ def summarize_users(team_records: list[dict]) -> list[dict]:
 
     summaries = list(per_user.values())
     for entry in summaries:
-        entry["late_rate"] = round(entry["late"] / entry["total"], 3) if entry["total"] else 0.0
-    return summaries
+        attended = sum(entry[k] for k in ATTENDED_STATUS_KEYS)
+        entry["late_rate"] = round(entry["late"] / attended, 3) if attended else 0.0
+    return sorted(summaries, key=lambda entry: entry["name"].lower())
 
 
 def late_rate_by_weekday(team_records: list[dict], working_days: set[int] | list[int], tz: ZoneInfo) -> list[dict]:
@@ -181,9 +188,6 @@ def daily_trend(records: list[dict], leave_requests: list[dict], start: date, en
     return out
 
 
-ATTENDED_STATUS_KEYS = ("present", "late", "early_leave", "missed_clockout")
-
-
 def present_rate(day_counts: dict) -> float | None:
     """Share of the people with a status that day who actually clocked in
     (late, left early or forgot to clock out still count as in); absent and
@@ -208,6 +212,63 @@ def status_distribution(records: list[dict], leave_requests: list[dict], start: 
         for key, count in day_counts.items():
             totals[key] += count
     return totals
+
+
+# How many Monday-start weeks the analytics page's weekly views cover.
+ANALYTICS_WEEKS = 8
+
+
+def records_since(records: list[dict], day: date, tz: ZoneInfo) -> list[dict]:
+    """Records whose clock-in falls on or after `day` in the org's timezone."""
+    return [record for record in records if _to_local_date(record["clock_in"], tz) >= day]
+
+
+def week_start(day: date) -> date:
+    """The Monday a day's week starts on (weeks run Monday–Sunday, matching
+    working_days' Monday=0)."""
+    return day - timedelta(days=day.weekday())
+
+
+def weekly_breakdown(records: list[dict], leave_requests: list[dict], start: date, end: date, tz: ZoneInfo) -> list[dict]:
+    """daily_trend summed into Monday-start weeks, from start's week through
+    end's. The last week is `partial` when end (normally today) falls before
+    its Sunday. Each week carries its own present_rate (None when nothing
+    was recorded that week)."""
+    weeks: dict[date, dict] = {}
+    for day in daily_trend(records, leave_requests, week_start(start), end, tz):
+        monday = week_start(date.fromisoformat(day["date"]))
+        week = weeks.setdefault(monday, {k: 0 for k in ALL_STATUS_KEYS})
+        for key in ALL_STATUS_KEYS:
+            week[key] += day[key]
+    out = []
+    for monday, counts in sorted(weeks.items()):
+        sunday = monday + timedelta(days=6)
+        out.append({
+            "week_start": monday.isoformat(),
+            "week_end": sunday.isoformat(),
+            "partial": sunday > end,
+            **counts,
+            "present_rate": present_rate(counts),
+        })
+    return out
+
+
+def weekly_by_person(records: list[dict], members: list[dict], week_starts: list[date], tz: ZoneInfo) -> list[dict]:
+    """Absences and early leaves per member per week — one row for every
+    member (no records yet still gets a row of zeros), sorted by name."""
+    counts: dict[tuple[str, date], dict[str, int]] = defaultdict(lambda: {"absent": 0, "early_leave": 0})
+    for record in records:
+        if record["status"] in ("absent", "early_leave"):
+            counts[(record["user_id"], week_start(_to_local_date(record["clock_in"], tz)))][record["status"]] += 1
+    rows = [
+        {
+            "user_id": member["id"],
+            "name": member["name"],
+            "weeks": [{"week_start": monday.isoformat(), **counts[(member["id"], monday)]} for monday in week_starts],
+        }
+        for member in members
+    ]
+    return sorted(rows, key=lambda row: row["name"].lower())
 
 
 def build_personal_calendar(
