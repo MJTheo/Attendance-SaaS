@@ -16,6 +16,7 @@ from app.schemas.auth import InviteRequest, UserProfile
 from app.schemas.organization import Organization, OrgSettings, RenameOrganization, UpdateOrgSettings
 from app.schemas.user import UpdateUserRole
 from app.services.analytics_service import (
+    ANALYTICS_WEEKS,
     build_personal_calendar,
     daily_trend,
     day_detail_for_org,
@@ -23,8 +24,12 @@ from app.services.analytics_service import (
     local_day_bounds,
     month_bounds,
     org_timezone,
+    records_since,
     status_distribution,
     summarize_users,
+    week_start,
+    weekly_breakdown,
+    weekly_by_person,
 )
 from app.services.invites_service import (
     DemoOrgInviteBlockedError,
@@ -63,25 +68,31 @@ def team_analytics(
     tz = org_timezone(org)
     records = AttendanceRepository(user_client).list_for_org(2000)
 
-    # Trend/distribution cover a trailing 30-day window rather than all-time,
-    # so the payload stays bounded and the chart reads as "recent activity".
-    # "Today" is the org's own local date, not the server's.
-    trend_end = datetime.now(tz).date()
-    trend_start = trend_end - timedelta(days=29)
-    range_start, _ = local_day_bounds(trend_start, tz)
-    _, range_end = local_day_bounds(trend_end, tz)
-    trend_records = AttendanceRepository(user_client).list_for_org_range(
+    # Trend, distribution and the team summary cover a trailing 30 days; the
+    # weekly views cover the last 8 Monday-start weeks. One fetch spans both
+    # (8 weeks always reaches further back than 30 days). "Today" is the
+    # org's own local date, not the server's.
+    today = datetime.now(tz).date()
+    trend_start = today - timedelta(days=29)
+    weeks_start = week_start(today) - timedelta(weeks=ANALYTICS_WEEKS - 1)
+    range_start, _ = local_day_bounds(weeks_start, tz)
+    _, range_end = local_day_bounds(today, tz)
+    window_records = AttendanceRepository(user_client).list_for_org_range(
         range_start.isoformat(), range_end.isoformat()
     )
     approved_leave = LeaveRequestsRepository(user_client).list_approved_in_range(
-        trend_start.isoformat(), trend_end.isoformat()
+        weeks_start.isoformat(), today.isoformat()
     )
+    last_30_days = records_since(window_records, trend_start, tz)
+    mondays = [weeks_start + timedelta(weeks=i) for i in range(ANALYTICS_WEEKS)]
 
     return {
-        "users": summarize_users(records),
+        "users": summarize_users(last_30_days),
         "by_weekday": late_rate_by_weekday(records, org["working_days"], tz),
-        "distribution": status_distribution(trend_records, approved_leave, trend_start, trend_end, tz),
-        "trend": daily_trend(trend_records, approved_leave, trend_start, trend_end, tz),
+        "distribution": status_distribution(window_records, approved_leave, trend_start, today, tz),
+        "trend": daily_trend(window_records, approved_leave, trend_start, today, tz),
+        "weeks": weekly_breakdown(window_records, approved_leave, weeks_start, today, tz),
+        "weeks_by_person": weekly_by_person(window_records, UsersRepository(user_client).list_for_org(), mondays, tz),
     }
 
 

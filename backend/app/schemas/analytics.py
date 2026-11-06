@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel
 
@@ -13,8 +13,10 @@ class UserAnalyticsSummary(BaseModel):
     present: int
     late: int
     early_leave: int
+    missed_clockout: int = 0
     absent: int
     total: int
+    # late ÷ days clocked in (present, late, early leave, missed clock-out)
     late_rate: float
 
 
@@ -43,7 +45,35 @@ class DayStatusCounts(BaseModel):
     absent: int
     sick_leave: int
     annual_leave: int
+    missed_clockout: int = 0
     present_rate: float | None = None
+
+
+class WeekSummary(BaseModel):
+    week_start: date
+    week_end: date
+    # The current week, still in progress.
+    partial: bool
+    present: int
+    late: int
+    early_leave: int
+    missed_clockout: int
+    absent: int
+    sick_leave: int
+    annual_leave: int
+    present_rate: float | None
+
+
+class PersonWeek(BaseModel):
+    week_start: date
+    absent: int
+    early_leave: int
+
+
+class PersonWeeks(BaseModel):
+    user_id: str
+    name: str
+    weeks: list[PersonWeek]
 
 
 class CalendarDay(BaseModel):
@@ -74,6 +104,9 @@ class TeamAnalytics(BaseModel):
     by_weekday: list[WeekdayLateRate]
     distribution: StatusDistribution
     trend: list[DayStatusCounts]
+    # The last 8 Monday-start weeks, oldest first (the last one in progress).
+    weeks: list[WeekSummary]
+    weeks_by_person: list[PersonWeeks]
 
 
 class Report(BaseModel):
